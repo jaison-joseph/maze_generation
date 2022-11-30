@@ -1,11 +1,13 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <array>
 #include <algorithm>
 #include <iterator>
 #include <random>
 #include <numeric>
+#include <string>
 
 using namespace std;
 
@@ -14,8 +16,9 @@ const int populationSize_ = 120;
 const float Pc_ = 0.05;
 const float Pm_ = 0.01;
 const float fill_ = 0.05;
-const int generations_ = 1;
-const int matingEventsPerGeneration_ = 2'000;
+const int generations_ = 2;
+const int matingEventsPerGeneration_ = 200;
+const int totalMatingEvents_ = generations_ * matingEventsPerGeneration_;
 const array<int, 2> entrance_ = {0, 0};
 const array<int, 2> exit_ = {size_-1, size_-1};
 const array<array<int, 2>, 4> checkpoints_ = {
@@ -56,6 +59,14 @@ ostream& operator<<(ostream& os, array<array<bool, size_>, size_>& m)
 ostream& operator<<(ostream& os, array<int, 2>& m)
 {
     os << '(' << m[0] << ", " << m[1] << ')';
+    // os << dt.mo << '/' << dt.da << '/' << dt.yr;
+    return os;
+}
+
+// overload of << for an int array of size 7 in the mating event population selection for 'evolution'
+ostream& operator<<(ostream& os, array<int, 7>& m)
+{
+    os << m[0] << ", " << m[1] << ", " << m[2] << ", " << m[3] << ", " << m[4] << ", " << m[5] << ", " << m[6];
     // os << dt.mo << '/' << dt.da << '/' << dt.yr;
     return os;
 }
@@ -225,6 +236,129 @@ int fitness(array<array<bool, size_>, size_>& maze) {
 }
 
 // maze[i][j] is true => wall, false => empty
+// this version adds cache 
+int fitness_2(array<array<bool, size_>, size_>& maze) {
+    
+    if (maze[entrance_[0]][entrance_[1]]) {
+        return 0;
+    }
+    if (maze[exit_[0]][exit_[1]]) {
+        return 0;
+    }
+    for (auto& c : checkpoints_) {
+        if (maze[c[0]][c[1]]) {
+            return 0;
+        }
+    }
+
+    int shortestPath = pathFinder(maze, entrance_, exit_);
+    // if no path was found from entrance to exit, return 0 as fitness
+    if (shortestPath == 0)
+        return 0;
+    
+    vector<int> checkpointDistances;
+    checkpointDistances.clear();
+    vector<array<int, 2>> path;
+    // a copy for the permutations
+    array<array<int, 2>, 4> c = checkpoints_; 
+    int totalDist, dist, bestResult;
+    bool pathFailed;
+    map<array<array<int, 2>, 2>, int> cache;
+    do {
+        path.clear();
+        path.push_back(entrance_);
+        path.insert(path.end(), c.begin(), c.end());
+        path.push_back(exit_);
+        totalDist = 0;
+        pathFailed = false;
+        for (int i = 0 ; i < path.size() - 1 ; ++i) {
+            if (cache.find({path[i], path[i+1]}) != cache.end())
+                dist = cache[{path[i], path[i+1]}];
+            else if (cache.find({path[i+1], path[i]}) != cache.end())
+                dist = cache[{path[i+1], path[i]}];
+            else {
+                dist = pathFinder(maze, path[i], path[i+1]);
+                cache[{path[i], path[i+1]}] = dist; 
+            }
+            if (dist == 0) {
+                pathFailed = true;
+                break;
+            }
+            totalDist += dist;
+        }
+        if (!pathFailed) {
+            checkpointDistances.push_back(totalDist);
+        }
+    } while (next_permutation(c.begin(), c.end()));
+    if (checkpointDistances.size() == 0)
+        return 0;
+    // min element returns an iterator, so we derefence it
+    bestResult = *min_element(checkpointDistances.begin(), checkpointDistances.end());
+
+    if (bestResult <= shortestPath)
+        return bestResult;
+    return 0;
+}
+
+// so apparently I overthought the fitness function godammit
+// maze[i][j] is true => wall, false => empty
+// this version adds cache 
+int fitness_3(array<array<bool, size_>, size_>& maze) {
+    
+    if (maze[entrance_[0]][entrance_[1]]) {
+        return 0;
+    }
+    if (maze[exit_[0]][exit_[1]]) {
+        return 0;
+    }
+    for (auto& c : checkpoints_) {
+        if (maze[c[0]][c[1]]) {
+            return 0;
+        }
+    }
+    
+    vector<int> checkpointDistances;
+    checkpointDistances.clear();
+    vector<array<int, 2>> path;
+    // a copy for the permutations
+    array<array<int, 2>, 4> c = checkpoints_; 
+    int totalDist, dist, bestResult;
+    bool pathFailed;
+    map<array<array<int, 2>, 2>, int> cache;
+    do {
+        path.clear();
+        path.push_back(entrance_);
+        path.insert(path.end(), c.begin(), c.end());
+        path.push_back(exit_);
+        totalDist = 0;
+        pathFailed = false;
+        for (int i = 0 ; i < path.size() - 1 ; ++i) {
+            if (cache.find({path[i], path[i+1]}) != cache.end())
+                dist = cache[{path[i], path[i+1]}];
+            else if (cache.find({path[i+1], path[i]}) != cache.end())
+                dist = cache[{path[i+1], path[i]}];
+            else {
+                dist = pathFinder(maze, path[i], path[i+1]);
+                cache[{path[i], path[i+1]}] = dist; 
+            }
+            if (dist == 0) {
+                pathFailed = true;
+                break;
+            }
+            totalDist += dist;
+        }
+        if (!pathFailed) {
+            checkpointDistances.push_back(totalDist);
+        }
+    } while (next_permutation(c.begin(), c.end()));
+    if (checkpointDistances.size() == 0)
+        return 0;
+    // min element returns an iterator, so we derefence it
+    bestResult = *min_element(checkpointDistances.begin(), checkpointDistances.end());
+    return bestResult;
+}
+
+// maze[i][j] is true => wall, false => empty
 int fitness_debug(array<array<bool, size_>, size_>& maze) {
     
    if (maze[entrance_[0]][entrance_[1]]) {
@@ -241,13 +375,6 @@ int fitness_debug(array<array<bool, size_>, size_>& maze) {
             return 0;
         }
     }
-
-    int shortestPath = pathFinder(maze, entrance_, exit_);
-    // if no path was found from entrance to exit, return 0 as fitness
-    if (shortestPath == 0) {
-        cout << "\n no path from entrance to exit";
-        return 0;
-    }
     
     vector<int> checkpointDistances;
     checkpointDistances.clear();
@@ -256,6 +383,11 @@ int fitness_debug(array<array<bool, size_>, size_>& maze) {
     array<array<int, 2>, 4> c = checkpoints_; 
     int totalDist, dist, bestResult;
     bool pathFailed;
+    map<
+        array<array<int, 2>, 2>, 
+        int
+    > cache;
+    int ct = 0;
     do {
         path.clear();
         path.push_back(entrance_);
@@ -264,17 +396,42 @@ int fitness_debug(array<array<bool, size_>, size_>& maze) {
         totalDist = 0;
         pathFailed = false;
         for (int i = 0 ; i < path.size() - 1 ; ++i) {
+            if (cache.find({path[i], path[i+1]}) != cache.end()) {
+                dist = cache[{path[i], path[i+1]}];
+                cout << ct++ << "hit \n";
+            }
+            else if (cache.find({path[i+1], path[i]}) != cache.end()) {
+                dist = cache[{path[i+1], path[i]}];
+                cout << ct++ << "hit \n";
+            }
+            else {
+                dist = pathFinder(maze, path[i], path[i+1]);
+                cache[{path[i], path[i+1]}] = dist; 
+            }
             dist = pathFinder(maze, path[i], path[i+1]);
             if (dist == 0) {
                 pathFailed = true;
                 break;
             }
             totalDist += dist;
+            // cout << 1; // just to see how successful each of these paths are; to decide whether its worth caching results
         }
+        // cout << '\n';
         if (!pathFailed) {
             checkpointDistances.push_back(totalDist);
         }
     } while (next_permutation(c.begin(), c.end()));
+
+    for(auto [key, val] : cache) {
+        cout    << "\n "
+                << '['
+                << "(" << key[0][0] << ", " << key[0][1] << ")"
+                << ", "
+                << "(" << key[1][0] << ", " << key[1][1] << ")"
+                << ']'
+                << " -> " << val;
+    }
+
     if (checkpointDistances.size() == 0) {
         cout << "\n no path that traverses all checkpoints";
         return 0;
@@ -286,10 +443,7 @@ int fitness_debug(array<array<bool, size_>, size_>& maze) {
         cout << "\n no path that traverses all checkpoints";
         return 0;
     }
-    if (bestResult <= shortestPath)
-        return bestResult;
-    cout << "\n best path is longer than direct entrance -> exit";
-    return 0;
+    return bestResult;
 }
 
 void testUniformMutation() {
@@ -324,10 +478,20 @@ void testrandomNumberGenerator() {
 }
 
 void testFitness() {
-    auto m = genMaze();
-    // cout << '\n' << m;
-    auto result = fitness_debug(m);
-    cout << "\n fitness: " << result;
+    array<array<bool, size_>, size_> m;
+    int r1, r2;
+    for (int i = 0 ; i < 100'000 ; ++i) {
+        m = genMaze();
+        r1 = fitness_2(m);
+        r2 = fitness(m);
+        if (r1 != r2) {
+            // cout << '\n' << m;
+            cout << "\n " << r1 << ", " << r2;
+        }
+        // else {
+        //     cout << "\n same";
+        // }
+    }
 }
 
 void testFitness_2() {
@@ -389,6 +553,37 @@ void testShuffle() {
     } while (next_permutation(c.begin(), c.end()));
 }
 
+void saveMazes(array<array<array<bool, size_>, size_>, populationSize_>& mazes, string label) {
+    ofstream myfile;
+    myfile.open ("example.txt");
+    myfile << label;
+    for (auto&m : mazes) {
+        myfile << m << '\n';
+    }
+    myfile.close();
+}
+
+void saveMatingEventStats(array<array<int, 7>, totalMatingEvents_> stats) {
+    ofstream myfile;
+    myfile.open ("matingEventStats.txt");
+    for (auto& row : stats) {
+        myfile << row << '\n';
+    }
+    myfile.close();
+}
+
+void saveGenerationStats(array<array<int, populationSize_>, generations_> stats) {
+    ofstream myfile;
+    myfile.open ("generationStats.txt");
+    for (auto& row : stats) {
+        for (auto& n : row) {
+            myfile << n << ", ";
+        }
+        myfile << '\n';
+    }
+    myfile.close();
+}
+
 void runner() {
     array<array<array<bool, size_>, size_>, populationSize_> population;
     for (auto& p : population)
@@ -399,13 +594,17 @@ void runner() {
     array<array<bool, size_>, size_> m1;
     array<array<bool, size_>, size_> m2;
     // indices of the two fittest members, then the two weakest members
-    int i1, i2;
+    int i1, i2, i3, i4, matingEventStatsCtr = 0;
+    string label;
+    array<array<int, populationSize_>, generations_> generationStats;
+    array<array<int, 7>, totalMatingEvents_> matingEventStats;
     array<int, populationSize_> allIndices;
     // fills allIndices with numbers starting from 0
     // https://stackoverflow.com/questions/4803898/fill-in-the-int-array-from-zero-to-defined-number
     iota(allIndices.begin(), allIndices.end(), 0);
     for (int g = 0 ; g < generations_ ; ++g) {
         for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
+            cout << m;
             indices.clear();
             // https://en.cppreference.com/w/cpp/algorithm/sample
             // randomly select 7 indices from the population array
@@ -422,7 +621,7 @@ void runner() {
             
             // find the fitness of the 7 population members
             for (int i = 0 ; i < 7 ; ++i) {
-                sortedFitnesses[i] = fitnesses[i] = fitness(population[indices[i]]);
+                sortedFitnesses[i] = fitnesses[i] = fitness_3(population[indices[i]]);
             }
             
             // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
@@ -430,13 +629,15 @@ void runner() {
             // the fitnesses are sorted in descending order
             sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
 
-            cout << "\n fitnesses: ";
-            for (auto&x : fitnesses)
-                cout << x << ", ";
+            // cout << "\n fitnesses: ";
+            // for (auto&x : fitnesses)
+            //     cout << x << ", ";
 
             // cout << "\n sortedFitnesses: ";
             // for (auto&x : sortedFitnesses)
             //     cout << x << ", ";
+
+            matingEventStats[matingEventStatsCtr++] = sortedFitnesses;
             
             // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
             // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
@@ -464,28 +665,76 @@ void runner() {
             // cout << "\n m1 and m2 AFTER evolution: \n";
             // cout << m1 << "\n\n" << m2;
 
-            // now i1 and i2 will contain indces of the weakest 2 elements
-            i1 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[6]) - fitnesses.begin();
-            i2 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[5]) - fitnesses.begin();
-            // i1 and i2 cannot be the same
-            while (i1 == i2 || fitnesses[i2] != sortedFitnesses[5]) {
-                i2 = (i2 + 1)%7;
+            // now i3 and i4 will contain indces of the weakest 2 elements
+            i3 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[6]) - fitnesses.begin();
+            i4 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[5]) - fitnesses.begin();
+            // i1, i2, i3 and i4 have to be different cannot be the same
+            while (i3 == i1 || i3 == i2 || fitnesses[i3] != sortedFitnesses[6]) {
+                i3 = (i3 + 1)%7;
+            }
+            while (i4 == i1 || i4 == i2 || i4 == i3 || fitnesses[i4] != sortedFitnesses[5]) {
+                i4 = (i4 + 1)%7;
             }
 
-            // cout << "\n i1: " << i1 << " | i2: " << i2 ;
+            // cout << "\n i3: " << i3 << " | i4: " << i4 ;
 
             // overwrite the weakest two with the modified fittest two
-            population[indices[i1]] = m1;
-            population[indices[i2]] = m2;
+            population[indices[i3]] = m1;
+            population[indices[i4]] = m2;
 
         }
+        for (int i = 0 ; i < populationSize_ ; ++i) {
+            generationStats[g][i] = fitness_3(population[i]); 
+        }
+        label = "\n";
+        label += "-----------------------------";
+        label += (" end of generation " + to_string(g+1) + ' ');
+        label += "-----------------------------";
+        label += '\n';
+        cout << label;
     }
+    saveMazes(population, label);
+    saveGenerationStats(generationStats);
+    saveMatingEventStats(matingEventStats);
+}
+
+void testSaveMazes() {
+    array<array<array<bool, size_>, size_>, populationSize_> mazes ;
+    for (auto&m : mazes)
+        m = genMaze();
+    saveMazes(mazes, string("hello there"));
+}
+
+void foo() {
+    map<array<int, 2>, int> cache;
+    cache[{0, 1}] = 1;
+    cout << cache[{0, 1}];
+    cout << '\n' << (cache.find({1, 1}) == cache.end());    
+}
+
+void revvit() {
+    array<int, 5> a {{1,2,3,4,5}};
+    auto result = find(a.rbegin(), a.rend(), 3);
+    if (result == a.rend())
+        cout << "\n no result";
+    else {
+        cout << "\n found @: " << (a.rend() - result);
+        cout << "\n *result: " << *result;
+        cout << "\n *a.begin(): " << *a.begin();
+        cout << "\n *a.end(): " << *a.end();
+        cout << "\n *a.rbegin(): " << *a.rbegin();
+        cout << "\n *a.rend(): " << *a.rend();
+    }
+        // cout << "\n found @: " << (a.rend() - result);
 }
 
 int main() {
     init();
-    // testFitness();
     runner();
+    // testFitness();
+    // foo();
+    // revvit();
+    // testSaveMazes();
     // testShuffle();
     return 0;
 }
