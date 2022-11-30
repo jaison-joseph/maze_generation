@@ -1,0 +1,132 @@
+
+
+Notes from: https://www.cse.unr.edu/~adamsc/Publications/Adams_Parekh_GECCO_2017.pdf
+
+Our chromosome is represented as a one dimensional array of bits of size 418, 
+     the first 400 representing the starting map state for our 20 × 20 maze level
+     the remaining 18 representing the cellular automata rules applied to the map.
+     of the 18;
+         first 9 are a bit mask for changing cell to be filled 
+         last 9 are a bit mask for changing cell to be blank 
+
+the 'evolution':
+     x =  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+     pick two indices at random, say 3 and 5
+     [1, 2, 3, | 4, 5, 6, 7, 8, 9, 10] -> [4, 5, 6, 7, 8, 9, 10, 1, 2, 3]
+     [4, 5, 6, 7, 8, | 9, 10, 1, 2, 3] -> [9, 10, 1, 2, 3, 4, 5, 6, 7, 8]
+     Two point crossover:
+         def twoPointCrossover(x):
+             i1 = random.randint(0, len(x)-1)
+             i2 = random.randint(i1, len(x)-1)
+             x = x[i1+1:] + x[:i1]
+             x = x[i2+1:] + x[:i2]
+             return x
+
+     Point mutation: randomly flip bits?
+ 
+the 'what makes it to the next gen' algo:
+     Fitness proportional selection:
+         prob(survival) of x = 'fitness' of x / sum of fitness of each individual  
+
+
+
+http://graphics.tudelft.nl/~rafa/myPapers/bidarra.TCIAIG.2014.pdf
+
+Search-Based Procedural Generation of Maze-Like Levels
+    - https://ieeexplore.ieee.org/document/5742785
+
+How the maze is initialized: 
+    SPARSE INITIALIZATION 
+        maze starts mostly empty and VARIATION OPERATORS fill in details while increasing fitness.
+    Different representations are found to produce mazes with very different appearances, despite same fitness function
+
+1. Direct representation:
+    - 1-0 rock-empty representation   
+    - for a x*y board, x*y bits long representation
+
+    - VARIATION OPERATORS:
+        1. UNIFORM CROSSOVER with probability Pc
+            operates on two chromosomes, exchanging their bits at each location with independent probability Pc.
+        2. UNIFORM MUTATION with probability Pm
+            flip bit at each location with probability Pm
+
+    - SPARSE INITIALIZATION    
+        in a maze, if bloacked and unblocked squares are equally likely, odds that it's traversable is ~ 0
+        so they added a 'fill' parameter i.e. p(cell is a wall), 
+        paper sets to 0.05
+        this is called sparse initialization
+
+2. Chromatic representation
+    - each cell can be 1 of 6 values/colors: {
+        0 : R,
+        1 : O,
+        2 : Y,
+        3 : G,
+        4 : B,
+        5 : V,
+    }
+
+    - VARIATION OPERATORS:
+        1. UNIFORM CROSSOVER (same as the Direct representation's crossover)
+        2. UNIFORM MUTATION: new color generated with probability Pm
+
+3. Positive and negative indirect representation
+    - seems oddly complicated initially to figure out
+    - not sure it's worth the time given that it's just a representation
+    - unless, there's certain unique properties of mazes created via this representation
+
+DEFINITIONS:
+    s:                      start square 
+    e:                      end square 
+    C:                      set of checkpoints. yields a method of specifying which checkpoints share a particular relation with a square.
+    |x|:                    shortest path dist from entrance to a square x, -1 if no path exists
+    MEMBER:                 a checkpoint is a MEMBER of a square x if it's on |x|'s path
+    Mx:                     set of members of a square x (all checkpoints on |x|)
+    RECONVERGENCE:          A square x is a RECONVERGENCE of checkpoints Ci and Cj if both Ci and Cj are members of x.
+                            - denotes a common point for shortest paths through multiple checkpoints
+    PRIMARY RECONVERGENCE | prc(Ci,Cj):  
+                            - path length from entrance square to a square that's RECONVERGENCE of checkpts Ci & Cj, 0 if non-exists
+                            - denoted by prc(Ci, Cj)
+                            - to measure when paths from the entrance through pairs of checkpoints first happen to converge
+    WITNESS TO PRIMARY RECONVERGENCE: 
+                            - Any square which is a reconvergence of checkpoints and whose distance to the entrance square is equal 
+                            - to the primary reconvergence of Ci & Cj and is said to be a WITNESS TO THE PRIMARY RECONVERGENCE OF Ci & Cj
+    ISOLATED PRIMARY RECONVERGENCE | iprc(Ci,Cj): 
+                            - An isolated primary reconvergence of checkpoints Ci & Cj is a witness to the primary reconvergence of Ci&Cj, 
+                                which has no checkpoints other than and as members. 
+                            - The function iprc(Ci,Cj) = 0 if no isolated primary reconvergence of Ci&Cj exists, iprc(Ci,Cj) = prc(Ci,Cj) otherwise.
+    CUL-DE-SAC:             A square x is a cul-de-sac if both |x| >= 0 and |x|>=|y| for all adjacent squares y.
+    Z:                      The set of all culs-de-sac in a maze is denoted by Z
+    k:                      the MANDATORY EXIT CHECKPOINT MEMBERSHITP LEVEL
+
+FITNESS FUNCTION DESIGN
+    - The key to the system presented for constructing fitness functions are the presence of checkpoints. 
+    - A checkpoint is nothing more than a position on the grid used to build the maze. 
+    - Noting which checkpoints are on a shortest path from entrance to exit permits substantial control over what features of a maze are rewarded by a fitness function. 
+
+    - call the fitness function FF.
+    - it'a  function we wanna maximize
+    - FF = 0 if:
+        - the entrance/exit levels are obstructed
+        - e has < k members, 
+    - If e has >=k members, then FF is defined as one of the below:
+        1.  Exit Path Length Fitness
+            - |e|
+            - this tends to encourage mazes w single long winding path
+        2. Primary Reconvergence Sum Fitness
+            - sum of prc(x,y) for x,y in checkpoints
+            - encourages checkpoints to be highly accessible
+            - nature of accessibility controlled by k ?????
+            - If a checkpoint is not required to be on a shortest path to the exit 
+                then higher fitness results from placing it at the end of a cul-de-sac.
+        3. Isolated Primary Reconvergence Sum Fitness
+            - sum of iprc(x,y) for x,y in checkpoints
+            - strongly encourages that paths branch, run over checkpoints, and then meet up again later
+        4. Cul-De-Sac Count Fitness ?????????????
+            - |Z|
+        5. Cul-De-Sac Length Fitness ???????????
+            - sum of |x|, for each x in Z
+
+ACTUALLY GENERATING THE MAZES ....
+    - the direct representations and the positive generative representations use a population size of 120
+    - negative representation: 1000

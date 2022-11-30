@@ -1,0 +1,16 @@
+this.neighborSurvivorCount = 5;
+this.wallProb = 0.4;
+this.smoothIterations = 2;
+
+this.neighborSurvivorCount = 5;
+this.wallProb = 0.62;
+this.smoothIterations = 5;
+
+this.neighborSurvivorCount = 5;
+this.wallProb = 0.66;
+this.smoothIterations = 4;
+
+this.neighborSurvivorCount = 5;
+this.wallProb = 0.63;
+this.smoothIterations = 4;
+
