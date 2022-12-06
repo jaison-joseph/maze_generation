@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <queue>
 #include <map>
 #include <array>
 #include <algorithm>
@@ -11,6 +12,8 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 using namespace std;
 
@@ -19,8 +22,8 @@ const int populationSize_ = 120;
 const float Pc_ = 0.05;
 const float Pm_ = 0.01;
 const float fill_ = 0.05;
-const int generations_ = 25;
-const int matingEventsPerGeneration_ = 200;
+const int generations_ = 250;
+const int matingEventsPerGeneration_ = 2000;
 const int totalMatingEvents_ = generations_ * matingEventsPerGeneration_;
 const array<int, 2> entrance_ = {0, 0};
 const array<int, 2> exit_ = {size_-1, size_-1};
@@ -32,22 +35,59 @@ const array<array<int, 2>, 4> checkpoints_ = {
 };
 array<array<int, size_>, size_> pathFinder_lk_;
 
+// for the worker thread queue
+struct fitnessArgs {
+    array<array<bool, size_>, size_>* maze;
+    array<int, 7>* fitnesses;
+    array<int, 7>* sortedFitnesses;
+    int index;
+};
+
+// This mutex and condition variable are used to control access to the jobs queue
+mutex queue_mutex;
+condition_variable queue_cv;
+
+// queue of jobs
+queue<fitnessArgs> jobs;
+
+bool allJobsDone = false;
+
 void init() {
     for (int i = 0 ; i < size_ ; ++i) {
         pathFinder_lk_[i].fill(1'000'000);
     }
 }
 
-// const array<array<int, 2>, 4> checkpoints_ = {
-//     array<int, 2> {1, 1},
-//     array<int, 2> {12, 18},
-//     array<int, 2> {18, 18},
-//     array<int, 2> {23, 24}
-// };
+void fitness_5(array<array<bool, size_>, size_>* maze, array<int, 7>* fitnesses, array<int, 7>* sortedFitnesses, int index);
+
+void workerFunction() {
+    fitnessArgs f;
+    while (true) {
+        // Wait until there is a job in the queue or the "done" flag is set
+        unique_lock<mutex> lock(queue_mutex);
+        queue_cv.wait(lock, []{return !jobs.empty() || allJobsDone;});
+
+        // If the "done" flag is set, then break out of the loop and exit the thread
+        if (allJobsDone) {
+            break;
+        }
+
+        // Dequeue the next job from the queue
+        f = jobs.front();
+        jobs.pop();
+
+        // Release the lock on the queue while we process the job
+        lock.unlock();
+
+        // Process the job
+        fitness_5(f.maze, f.fitnesses, f.sortedFitnesses, f.index);
+
+    }
+    cout << "Worker thread processing job done";
+}
 
 // overload of << for a maze
-ostream& operator<<(ostream& os, array<array<bool, size_>, size_>& m)
-{
+ostream& operator<<(ostream& os, array<array<bool, size_>, size_>& m) {
     for (array<bool, size_>&i : m) {
         for (bool j : i) {
             os << j << ", ";
@@ -59,24 +99,21 @@ ostream& operator<<(ostream& os, array<array<bool, size_>, size_>& m)
 }
 
 // overload of << for an int array of size 2 used as indices in this program
-ostream& operator<<(ostream& os, array<int, 2>& m)
-{
+ostream& operator<<(ostream& os, array<int, 2>& m) {
     os << '(' << m[0] << ", " << m[1] << ')';
     // os << dt.mo << '/' << dt.da << '/' << dt.yr;
     return os;
 }
 
 // overload of << for an int array of size 7 in the mating event population selection for 'evolution'
-ostream& operator<<(ostream& os, array<int, 7>& m)
-{
+ostream& operator<<(ostream& os, array<int, 7>& m) {
     os << m[0] << ", " << m[1] << ", " << m[2] << ", " << m[3] << ", " << m[4] << ", " << m[5] << ", " << m[6];
     // os << dt.mo << '/' << dt.da << '/' << dt.yr;
     return os;
 }
 
 // overload of << for vector of int type
-ostream& operator<<(ostream& os, vector<int>& x)
-{
+ostream& operator<<(ostream& os, vector<int>& x) {
     for (int& i : x) {
         os << i << ", ";
     }
@@ -98,37 +135,6 @@ array<array<bool, size_>, size_> genMaze() {
     }
     return maze;
 }
-
-// void uniformMutation(array<array<bool, size_>, size_>& m) {
-//      // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
-//     random_device dev;
-//     mt19937 rng(dev());
-//     uniform_int_distribution<mt19937::result_type> getNum(1,1000); // distribution in range [1, 1000]
-//     for (auto&i : m) {
-//         for (auto& j : i) {
-//             if ((float(getNum(rng))/1000.0f) <= Pm_) {
-//                 j = !j;
-//             }
-//         }
-//     }
-// }
-
-// void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
-//      // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
-//     random_device dev;
-//     mt19937 rng(dev());
-//     bool foo;
-//     uniform_int_distribution<mt19937::result_type> getNum(1,1000); // distribution in range [1, 1000]
-//     for (int i = 0 ; i < size_ ; ++i) {
-//         for (int j = 0 ; j < size_ ; ++j) {
-//             if (float(getNum(rng))/1000.0f <= Pc_) {
-//                 foo = m1[i][j];
-//                 m1[i][j] = m2[i][j];
-//                 m2[i][j] = foo;   
-//             }
-//         }
-//     }
-// }
 
 // easier to divide by powers of 2
 void uniformMutation(array<array<bool, size_>, size_>& m) {
@@ -470,32 +476,68 @@ void fitness_4(array<array<bool, size_>, size_>& maze, array<int, 7>& fitnesses,
     }
 }
 
-void fitness_5(array<array<bool, size_>, size_>& maze, array<int, 7>& fitnesses, array<int, 7>& sortedFitnesses, int index) {
-    if (maze[entrance_[0]][entrance_[1]]) {
-        fitnesses[index] = sortedFitnesses[index] = 0;
-        // return 0;
+void fitness_5(array<array<bool, size_>, size_>* maze, array<int, 7>* fitnesses, array<int, 7>* sortedFitnesses, int index) {
+    
+    if ((*maze)[entrance_[0]][entrance_[1]]) {
+        (*fitnesses)[index] = (*sortedFitnesses)[index] = 0;
+        return;
     }
-    if (maze[exit_[0]][exit_[1]]) {
-        fitnesses[index] = sortedFitnesses[index] = 0;
-        // return 0;
+    if ((*maze)[exit_[0]][exit_[1]]) {
+        (*fitnesses)[index] = (*sortedFitnesses)[index] = 0;
+        return;
     }
     for (auto& c : checkpoints_) {
-        if (maze[c[0]][c[1]]) {
-            fitnesses[index] = sortedFitnesses[index] = 0;
-            // return 0;
+        if ((*maze)[c[0]][c[1]]) {
+            (*fitnesses)[index] = (*sortedFitnesses)[index] = 0;
+            return;
         }
     }
-
+    
     vector<int> checkpointDistances;
     checkpointDistances.clear();
     vector<array<int, 2>> path;
     // a copy for the permutations
-    array<array<int, 2>, 4> c = checkpoints_;
+    array<array<int, 2>, 4> c = checkpoints_; 
     int totalDist, dist, bestResult;
     bool pathFailed;
     map<array<array<int, 2>, 2>, int> cache;
+    do {
+        path.clear();
+        path.push_back(entrance_);
+        path.insert(path.end(), c.begin(), c.end());
+        path.push_back(exit_);
+        totalDist = 0;
+        pathFailed = false;
+        for (int i = 0 ; i < path.size() - 1 ; ++i) {
+            if (cache.find({path[i], path[i+1]}) != cache.end())
+                dist = cache[{path[i], path[i+1]}];
+            else if (cache.find({path[i+1], path[i]}) != cache.end())
+                dist = cache[{path[i+1], path[i]}];
+            else {
+                dist = pathFinder(ref(*maze), path[i], path[i+1]);
+                cache[{path[i], path[i+1]}] = dist; 
+            }
+            if (dist == 0) {
+                pathFailed = true;
+                break;
+            }
+            totalDist += dist;
+        }
+        if (!pathFailed) {
+            checkpointDistances.push_back(totalDist);
+        }
+    } while (next_permutation(c.begin(), c.end()));
+    if (checkpointDistances.size() == 0) {
+        (*fitnesses)[index] = (*sortedFitnesses)[index] = 0;
+        return;
+    }
+    else {
+        // min element retus an iterator, so we derefence it
+        bestResult = *min_element(checkpointDistances.begin(), checkpointDistances.end());
+        (*fitnesses)[index] = (*sortedFitnesses)[index] = bestResult;
+        return;
+    }
 }
-
 
 // maze[i][j] is true => wall, false => empty
 int fitness_debug(array<array<bool, size_>, size_>& maze) {
@@ -619,17 +661,22 @@ void testrandomNumberGenerator() {
 void testFitness() {
     array<array<bool, size_>, size_> m;
     int r1, r2;
-    for (int i = 0 ; i < 100'000 ; ++i) {
+    array<int, 7> fitnesses;
+    array<int, 7> sortedFitnesses;
+    int index = 0;
+    for (int i = 0 ; i < 100 ; ++i) {
         m = genMaze();
-        r1 = fitness_2(m);
-        r2 = fitness(m);
-        if (r1 != r2) {
+        r1 = fitness_3(m);
+        fitness_5(&m, &fitnesses, &sortedFitnesses, 0);
+        r2 = fitnesses[0];
+        // if (r1 != r2) {
+            // cout << "\n " << r1 << ", " << r2;
             // cout << '\n' << m;
-            cout << "\n " << r1 << ", " << r2;
-        }
+        // }
         // else {
         //     cout << "\n same";
         // }
+        cout << "\n " << r1 << ", " << r2;
     }
 }
 
@@ -775,7 +822,7 @@ void runner() {
            // for (auto&x : fitnesses)
            //     cout << x << ", ";
 
-           // cout << "\n sortedFitnesses: ";
+           cout << "\n sortedFitnesses: " << sortedFitnesses;
            // for (auto&x : sortedFitnesses)
            //     cout << x << ", ";
 
@@ -1105,7 +1152,7 @@ void runner_4() {
     iota(allIndices.begin(), allIndices.end(), 0);
     for (int g = 0 ; g < generations_ ; ++g) {
         for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
-           //cout << m;
+           cout << m;
             indices.clear();
             // https://en.cppreference.com/w/cpp/algorithm/sample
             // randomly select 7 indices from the population array
@@ -1193,12 +1240,12 @@ void runner_4() {
             population[indices[i4]] = m2;
 
         }
-       /*label = "\n";
+       label = "\n";
        label += "-----------------------------";
        label += (" end of generation " + to_string(g+1) + ' ');
        label += "-----------------------------";
        label += '\n';
-       cout << label;*/
+       cout << label;
     }
     // saveMazes(population, label);
     // saveGenerationStats(generationStats);
@@ -1220,13 +1267,21 @@ void runner_5() {
     string label;
     // threading!!
     array<thread, 7> workers;
+    // create the worker threads
+    for (int i = 0 ; i < 7 ; ++i) {
+        workers[i] = thread(workerFunction);
+    }
+    vector<fitnessArgs> jobs;
+    fitnessArgs job;
+    job.fitnesses = &fitnesses;
+    job.sortedFitnesses = &sortedFitnesses;
     array<int, populationSize_> allIndices;
     // fills allIndices with numbers starting from 0
     // https://stackoverflow.com/questions/4803898/fill-in-the-int-array-from-zero-to-defined-number
     iota(allIndices.begin(), allIndices.end(), 0);
     for (int g = 0 ; g < generations_ ; ++g) {
         for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
-           //cout << m;
+        //    cout << m;
             indices.clear();
             // https://en.cppreference.com/w/cpp/algorithm/sample
             // randomly select 7 indices from the population array
@@ -1245,13 +1300,16 @@ void runner_5() {
 
             // auto start = chrono::steady_clock::now();
             
+            // add jobs to the queue
             for (int i = 0 ; i < 7 ; ++i) {
                 // sortedFitnesses[i] = fitnesses[i] = fitness_3(population[indices[i]]);
-                workers[i] = thread(fitness_4, ref(population[indices[i]]), ref(fitnesses), ref(sortedFitnesses), i);
+                job.maze = &(population[indices[i]]);
+                job.index = i;
+                jobs.push_back(job);
             }
-            for (auto& th : workers) {
-                th.join();
-            }
+            // for (auto& th : workers) {
+            //     th.join();
+            // }
             
             // auto end = chrono::steady_clock::now();
             // auto diff = end-start;
@@ -1260,13 +1318,13 @@ void runner_5() {
             // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
             // find the fittest two members
             // the fitnesses are sorted in descending order
-            //sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
+            sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
 
             // cout << "\n fitnesses: ";
             // for (auto&x : fitnesses)
             //     cout << x << ", ";
 
-            // cout << "\n sortedFitnesses: ";
+            cout << "\n sortedFitnesses: " << sortedFitnesses;
             // for (auto&x : sortedFitnesses)
             //     cout << x << ", ";
 
@@ -1314,13 +1372,27 @@ void runner_5() {
             population[indices[i4]] = m2;
 
         }
-       /*label = "\n";
+       label = "\n";
        label += "-----------------------------";
        label += (" end of generation " + to_string(g+1) + ' ');
        label += "-----------------------------";
        label += '\n';
-       cout << label;*/
+       cout << label;
     }
+    {
+        lock_guard<mutex> lock(queue_mutex);
+        allJobsDone = true;
+    }
+    queue_cv.notify_all();
+
+    cout << "\n waiting for all threads to join";
+
+    // Wait for the worker threads to finish
+    for (auto& worker : workers) {
+        worker.join();
+    }
+
+    cout << "\n all threads have joined";
     // saveMazes(population, label);
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);
@@ -1389,15 +1461,15 @@ void hmmThread() {
     cout << "\n result: " << foo;
 }
 
-// g++ -Wl,--stack,16777216 -O3 -std=c++17 genetic_2.cpp
+// g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_2.cpp -o foo.exe
 int main() {
     init();
     // for (int i = 0 ; i < 10 ; ++i)
-    auto start = chrono::steady_clock::now();
-    runner_4();
-    auto end = chrono::steady_clock::now();
-    auto diff = end - start;
-    cout << "\n time: " << chrono::duration<double, milli>(diff).count() << " ms";
+    // auto start = chrono::steady_clock::now();
+    runner_5();
+    // auto end = chrono::steady_clock::now();
+    // auto diff = end - start;
+    // cout << "\n time: " << chrono::duration<double, milli>(diff).count() << " ms";
      //hmmThread();
     // testFitness();
     // foo();

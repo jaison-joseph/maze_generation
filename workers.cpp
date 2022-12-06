@@ -4,15 +4,39 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <array>
+
+using namespace std;
+
+const int size_ = 30;
 
 // god bless chatgpt
 
+struct fitnessArgs {
+    array<array<bool, size_>, size_>& maze;
+    array<int, 7>& fitnesses;
+    array<int, 7>& sortedFitnesses;
+    int index;
+};
+
+struct check {
+    int foo;
+    int bar;
+};
+
+ostream& operator<<(ostream& os, check& m) {
+    os << '(' << m.foo << ", " << m.bar << ")\n";
+    return os;
+}
+
+queue<fitnessArgs> q;
+
 // This is the queue of jobs that the worker threads will process
-std::queue<int> jobs;
+queue<int> jobs;
 
 // This mutex and condition variable are used to control access to the jobs queue
-std::mutex queue_mutex;
-std::condition_variable queue_cv;
+mutex queue_mutex;
+condition_variable queue_cv;
 
 // This flag is used to signal to the worker threads when all jobs have been added to the queue
 bool done = false;
@@ -23,7 +47,7 @@ void worker_function()
   while (true)
   {
     // Wait until there is a job in the queue or the "done" flag is set
-    std::unique_lock<std::mutex> lock(queue_mutex);
+    unique_lock<mutex> lock(queue_mutex);
     queue_cv.wait(lock, []{return !jobs.empty() || done;});
 
     // If the "done" flag is set, then break out of the loop and exit the thread
@@ -40,14 +64,13 @@ void worker_function()
     lock.unlock();
 
     // Process the job
-    std::cout << "Worker thread processing job: " << job << std::endl;
+    cout << "Worker thread processing job: " << job << endl;
   }
 }
 
-int main()
-{
+void runJobs() {
   // Create the worker threads
-  std::vector<std::thread> workers;
+  vector<thread> workers;
   for (int i = 0; i < 7; i++)
   {
     workers.emplace_back(worker_function);
@@ -60,10 +83,10 @@ int main()
   }
 
   // Signal to the worker threads that all jobs have been added to the queue
-  {
-    std::lock_guard<std::mutex> lock(queue_mutex);
+  // {
+    lock_guard<mutex> lock(queue_mutex);
     done = true;
-  }
+  // }
   queue_cv.notify_all();
 
   // Wait for the worker threads to finish
@@ -71,6 +94,17 @@ int main()
   {
     worker.join();
   }
+}
 
-  return 0;
+int main() {
+    // check a;
+    // vector<check> v;
+    // for (int i = 0 ; i < 5 ; ++i) {
+    //     a.foo = i;
+    //     a.bar = i+1;
+    //     v.push_back(a);
+    // }
+    // for (auto& t : v)
+    //     cout << t;
+    runJobs();
 }
