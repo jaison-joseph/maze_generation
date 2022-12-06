@@ -49,6 +49,18 @@ ostream& operator<<(ostream& os, array<array<bool, size_>, size_>& m) {
     return os;
 }
 
+// overload for lookup in the pathfinder
+ostream& operator<<(ostream& os, array<array<int, size_>, size_>& m) {
+    for (array<int, size_>&i : m) {
+        for (int j : i) {
+            os << j << ", ";
+        }
+        os << '\n';
+    }
+    // os << dt.mo << '/' << dt.da << '/' << dt.yr;
+    return os;
+}
+
 // overload of << for an int array of size 2 used as indices in this program
 ostream& operator<<(ostream& os, array<int, 2>& m) {
     os << '(' << m[0] << ", " << m[1] << ')';
@@ -178,6 +190,8 @@ int pathFinder(
                 q.push_back(foo);
         }
     }
+
+    // cout << "\n lk: \n" << lk;
 
     return lk[end[0]][end[1]] == 1'000'000 ? 0 : lk[end[0]][end[1]];
 }
@@ -418,6 +432,12 @@ void testShuffle() {
     } while (next_permutation(c.begin(), c.end()));
 }
 
+void testPathFinder() {
+    auto m = genMaze();
+    auto result = pathFinder(m, entrance_, exit_);
+    cout << "\n path dist: " << result;
+}
+
 void saveMazes(array<array<array<bool, size_>, size_>, populationSize_>& mazes, string label) {
     ofstream myfile;
     myfile.open ("genetic_3_results.txt");
@@ -427,6 +447,17 @@ void saveMazes(array<array<array<bool, size_>, size_>, populationSize_>& mazes, 
     }
     myfile.close();
 }
+
+void saveMazes_2(vector<array<array<bool, size_>, size_>>& mazes, string label) {
+    ofstream myfile;
+    myfile.open ("genetic_3_results_save_2.txt");
+    myfile << label;
+    for (auto&m : mazes) {
+        myfile << m << '\n';
+    }
+    myfile.close();
+}
+
 
 // void saveMatingEventStats(vector<vector<int>>& stats) {
 void saveMatingEventStats(array<array<int, 7>, totalMatingEvents_>& stats) {
@@ -565,6 +596,127 @@ void runner_3() {
     // saveMatingEventStats(matingEventStats);
 }
 
+// only save the mazes with fitness > 0
+void runner_4() {
+    array<array<array<bool, size_>, size_>, populationSize_> population;
+    for (auto& p : population)
+        p = genMaze();
+    array<int, 7> fitnesses;
+    array<int, 7> sortedFitnesses;
+    vector<int> indices;
+    array<array<bool, size_>, size_> m1;
+    array<array<bool, size_>, size_> m2;
+    // indices of the two fittest members, then the two weakest members
+    int i1, i2, i3, i4;
+    string label;
+    array<int, populationSize_> allIndices;
+    // fills allIndices with numbers starting from 0
+    // https://stackoverflow.com/questions/4803898/fill-in-the-int-array-from-zero-to-defined-number
+    iota(allIndices.begin(), allIndices.end(), 0);
+    for (int g = 0 ; g < generations_ ; ++g) {
+        for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
+        //    cout << m;
+            indices.clear();
+            // https://en.cppreference.com/w/cpp/algorithm/sample
+            // randomly select 7 indices from the population array
+            sample(
+                allIndices.begin(), allIndices.end(), 
+                back_inserter(indices),
+                7, 
+                mt19937{random_device{}()}
+            );
+
+            // cout << "\n indices: ";
+            // for (auto&x : indices)
+            //     cout << x << ", ";
+            
+            // find the fitness of the 7 population members
+
+            // auto start = chrono::steady_clock::now();
+            for (int i = 0 ; i < 7 ; ++i) {
+                sortedFitnesses[i] = fitnesses[i] = fitness_3(population[indices[i]]);
+            }
+            // auto end = chrono::steady_clock::now();
+            // auto diff = end-start;
+            // cout<<"\n time: "<< chrono::duration<double, milli>(diff).count()<<" ms";
+            
+            // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
+            // find the fittest two members
+            // the fitnesses are sorted in descending order
+            sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
+
+            // cout << "\n fitnesses: ";
+            // for (auto&x : fitnesses)
+            //     cout << x << ", ";
+
+            // for (auto&x : sortedFitnesses)
+            //     cout << x << ", ";
+
+            // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
+            // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
+            i1 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[0]) - fitnesses.begin();
+            i2 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[1]) - fitnesses.begin();
+            // i1 and i2 cannot be the same
+            while (i1 == i2 || fitnesses[i2] != sortedFitnesses[1]) {
+                i2 = (i2 + 1)%7;
+            }
+
+            // cout << "\n i1: " << i1 << " | i2: " << i2 ;
+
+            // m1 and m2 are copies of the two fittest mazes
+            m1 = population[indices[i1]];
+            m2 = population[indices[i2]];
+
+            // cout << "\n m1 and m2 BEFORE evolution: \n";
+            // cout << m1 << "\n\n" << m2;
+
+            // evolution ....
+            uniformCrossover(m1, m2);
+            uniformMutation(m1);
+            uniformMutation(m2);
+
+            // cout << "\n m1 and m2 AFTER evolution: \n";
+            // cout << m1 << "\n\n" << m2;
+
+            // now i3 and i4 will contain indces of the weakest 2 elements
+            i3 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[6]) - fitnesses.begin();
+            i4 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[5]) - fitnesses.begin();
+            // i1, i2, i3 and i4 have to be different cannot be the same
+            while (i3 == i1 || i3 == i2 || fitnesses[i3] != sortedFitnesses[6]) {
+                i3 = (i3 + 1)%7;
+            }
+            while (i4 == i1 || i4 == i2 || i4 == i3 || fitnesses[i4] != sortedFitnesses[5]) {
+                i4 = (i4 + 1)%7;
+            }
+
+            // cout << "\n i3: " << i3 << " | i4: " << i4 ;
+
+            // overwrite the weakest two with the modified fittest two
+            population[indices[i3]] = m1;
+            population[indices[i4]] = m2;
+
+        }
+        cout << "\n sortedFitnesses: " << sortedFitnesses;
+    //    label = "\n";
+    //    label += "-----------------------------";
+    //    label += (" end of generation " + to_string(g+1) + ' ');
+    //    label += "-----------------------------";
+    //    label += '\n';
+    //    cout << label;
+    }
+    vector<array<array<bool, size_>, size_>> niceOnes;
+    for (auto&p : population) {
+        auto result = fitness_3(p);
+        if (result > 0) {
+            cout << "\n fitness: " << result;
+            niceOnes.push_back(p);
+        }
+    }
+    saveMazes_2(niceOnes, label);
+    // saveGenerationStats(generationStats);
+    // saveMatingEventStats(matingEventStats);
+}
+
 void testSaveMazes() {
     array<array<array<bool, size_>, size_>, populationSize_> mazes ;
     for (auto&m : mazes)
@@ -575,10 +727,11 @@ void testSaveMazes() {
 // g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o a
 int main() {
     init();
-    auto start = chrono::steady_clock::now();
-    runner_3();
-    auto end = chrono::steady_clock::now();
-    auto diff = end - start;
-    cout << "\n time: " << chrono::duration<double, milli>(diff).count() << " ms";
+    // testPathFinder();
+    // auto start = chrono::steady_clock::now();
+    runner_4();
+    // auto end = chrono::steady_clock::now();
+    // auto diff = end - start;
+    // cout << "\n time: " << chrono::duration<double, milli>(diff).count() << " ms";
     return 0;
 }
