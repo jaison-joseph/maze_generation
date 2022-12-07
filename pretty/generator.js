@@ -44,48 +44,70 @@ function findShortestPath(array) {
 }
 
 // making way from entrance to exit
-function traceBack(lk, s) {
+function traceBack(lk, fitness, end) {
     const size_ = 30;
-    let pt = s[s.length - 1];
-    let dist = lk[pt[0]][pt[1]];
-    if (pt[0] == 29 && pt[1] == 29)
-        return s;
-    dist += 1;
-    let foo = [0,0];
     let nextSteps = [];
-    let result = [];
+    let stacks = [[[0, 0]]];
+    console.log("initial stacks: ", stacks)
+    console.log("fitness: ", fitness)
+    console.log("lk: ", lk)
+    
+    let newStacks = [];
+    // console.log("[0]: ", stacks[0]);
 
-    foo = [pt[0]+1, pt[1]];
-    if (foo[0] < size_ && lk[foo[0]][foo[1]] === dist) {
-        nextSteps.push(foo);
-    }
+    // stacks.forEach(s => {console.log("stack: ", s);});
 
-    foo = [pt[0], pt[1]+1];
-    if (foo[1] < size_ && lk[foo[0]][foo[1]] === dist) {
-        nextSteps.push(foo);
-    }
-    foo = [pt[0]-1, pt[1]];
-    if (foo[0] >= 0 && lk[foo[0]][foo[1]] === dist) {
-        nextSteps.push(foo);
-    }
+    while(stacks[0].length != fitness) {
+        newStacks = [];
+        // if (stacks[0].length >= fitness) {
+        //     break;
+        // }
+        for (let i = 0 ; i < stacks.length ; i++) {
+        // stacks.forEach(stack => {
+            stack = stacks[i];
+            // console.log("stack: ", stack);
+            pt = stack[stack.length-1];
+            dist = lk[pt[0]][pt[1]];
+            dist += 1;
+            nextSteps = [];
+    
+            foo = [pt[0]+1, pt[1]];
+            if (foo[0] < size_ && lk[foo[0]][foo[1]] === dist) {
+                nextSteps.push(foo);
+            }
+        
+            foo = [pt[0], pt[1]+1];
+            if (foo[1] < size_ && lk[foo[0]][foo[1]] === dist) {
+                nextSteps.push(foo);
+            }
+            foo = [pt[0]-1, pt[1]];
+            if (foo[0] >= 0 && lk[foo[0]][foo[1]] === dist) {
+                nextSteps.push(foo);
+            }
+        
+            foo = [pt[0], pt[1]-1];
+            if (foo[1] >= 0 && lk[foo[0]][foo[1]] === dist) {
+                nextSteps.push(foo);
+            }
 
-    foo = [pt[0], pt[1]-1];
-    if (foo[1] >= 0 && lk[foo[0]][foo[1]] === dist) {
-        nextSteps.push(foo);
+            nextSteps.forEach(s => {
+                stack.push(s);
+                newStacks.push([...stack]);
+                stack.pop();
+            });
+        };
+        // console.log("newStacks: ", newStacks);
+        stacks = newStacks;
+        console.log("len: ", stacks[0].length);
     }
-
-    nextSteps.forEach(pt => {
-        s.push(pt);
-        result = traceBack(lk, s);
-        if (result.length > 0) {
-            return result;
-        }
-        s.pop();
+    stacks.forEach(s => {
+        console.log("stack: ", s);
     });
-
-    return [];
+    // return the path on the stacks with last element == end square
+    return stacks.filter(x => x[x.length-1][0] == end[0] && x[x.length-1][1] == end[1])[0];
 }
 
+// returns path length, and array of steps from start to end through 'maze'
 function pathFinder(maze, start, end) {
     const size_ = 30;
     let lk = new Array(size_).fill(0).map(() => new Array(size_).fill(100_000));
@@ -105,43 +127,69 @@ function pathFinder(maze, start, end) {
         if (dist > lk[end[0]][end[1]]) 
             continue;
 
+            
         foo = [pt[0]+1, pt[1]];
+        // if (foo[0] == end[0] && foo[1] == end[1]) {
+            // console.log("aha part 2", foo, dist, maze[foo[0]][foo[1]]);
+        // }
         if (foo[0] < size_ && lk[foo[0]][foo[1]] > dist && maze[foo[0]][foo[1]] === 0) {
             lk [foo[0]] [foo[1]] = dist;
             if (foo[0] != end[0] || foo[1] != end[1]) {
                 q.push(foo);
             }
+            // else {
+                // console.log("gotcha");
+            // }
         }
 
         foo = [pt[0], pt[1]+1];
+        // if (foo[0] == end[0] && foo[1] == end[1]) {
+            // console.log("aha part 2", foo, dist, maze[foo[0]][foo[1]]);
+        // }
         if (foo[1] < size_ && lk[foo[0]][foo[1]] > dist && maze[foo[0]][foo[1]] === 0) {
             lk [foo[0]] [foo[1]] = dist;
             if (foo[0] != end[0] || foo[1] != end[1]) {
                 q.push(foo);
             }
+            // else {
+                // console.log("gotcha");
+            // }
         }
+
         foo = [pt[0]-1, pt[1]];
+        // if (foo[0] == end[0] && foo[1] == end[1]) {
+            // console.log("aha part 2", foo, dist, maze[foo[0]][foo[1]]);
+        // }
         if (foo[0] >= 0 && lk[foo[0]][foo[1]] > dist && maze[foo[0]][foo[1]] === 0) {
             lk [foo[0]] [foo[1]] = dist;
             if (foo[0] != end[0] || foo[1] != end[1]) {
                 q.push(foo);
             }
+            // else {
+                // console.log("gotcha");
+            // }
         }
 
         foo = [pt[0], pt[1]-1];
+        // if (foo[0] == end[0] && foo[1] == end[1]) {
+            // console.log("aha part 2", foo, dist, maze[foo[0]][foo[1]]);
+        // }
         if (foo[1] >= 0 && lk[foo[0]][foo[1]] > dist && maze[foo[0]][foo[1]] === 0) {
             lk [foo[0]] [foo[1]] = dist;
             if (foo[0] != end[0] || foo[1] != end[1]) {
                 q.push(foo);
             }
+            // else {
+                // console.log("gotcha");
+            // }
         }
     }
 
-    console.log(lk);
+    const traceBackResult = traceBack(lk, lk[end[0]][end[1]]+1, end);  
 
-    console.log(traceBack(lk, [[0, 0]]));
+    console.log("traceBack: ", traceBackResult);
 
-    return lk[end[0]][end[1]] == 100_000 ? 0 : lk[end[0]][end[1]];
+    return lk[end[0]][end[1]] == 100_000 ? [0, []] : [lk[end[0]][end[1]], traceBackResult];
 }
 
 function drawArray(array) {
@@ -175,10 +223,15 @@ function process(input) {
     var lines = [];
     input.split("\n").forEach(l => {
         l = l.trim();
-        lines.push(l.split(", ").map(x=>Number(x)));
+        l = l.split(", ");
+        l[l.length- 1] = l[l.length- 1][0];
+        lines.push(l.map(x=>Number(x)));
     });
     drawArray(lines);
-    console.log(pathFinder(lines, [0, 0], [29, 29]));
+    console.log("lines", lines);
+    const pathFinderResult = pathFinder(lines, [0, 0], [29, 29]);
+    console.log("pathFinder path length: ", pathFinderResult[0]);
+    console.log("pathFinder path solution: ", pathFinderResult[1]);
 }
 
 function previewFile() {
