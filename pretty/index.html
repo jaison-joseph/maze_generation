@@ -9,7 +9,16 @@
         <title>HTML 5 Boilerplate</title>
     </head>
     <body>
-        <input type="file" onchange="previewFile()" /><br />
+        <input type="file" onchange="previewFile()" />
+        <button type="button" onclick="showSolution()">Show solution</button>
+        <button type="button" onclick="hideSolution()">Hide solution</button>
+
+        <button type="button" onclick="showCheckpoints()">Show checkpoints</button>
+        <button type="button" onclick="hideCheckpoints()">Hide checkpoints</button>
+
+        <button type="button" onclick="showCheckpointSolution()">Show checkpoint solution</button>
+        <button type="button" onclick="hideCheckpointSolution()">Hide checkpoint solution</button>
+        <br />
         <canvas id="canvas" width="900" height="900" style="border: 1px solid"></canvas>
     </body>
 </html>
