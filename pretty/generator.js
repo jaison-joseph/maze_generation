@@ -1,48 +1,3 @@
-function findShortestPath(array) {
-    // Check if the input array is valid (i.e. a 30 by 30 2D array of 1's and 0's)
-    if (!Array.isArray(array) || array.length !== 30 || !Array.isArray(array[0]) || array[0].length !== 30) {
-      return;
-    }
-  
-    // Create a 30 by 30 2D array to store the shortest path
-    const path = new Array(30).fill(0).map(() => new Array(30).fill(0));
-  
-    // Use BFS (Breadth-First Search) to find the shortest path
-    const queue = [[0, 0]]; // Start from the upper left corner (i.e. array[0][0])
-    const visited = new Set();
-    visited.add("0,0");
-    while (queue.length > 0) {
-      console.log(queue);
-      const [i, j] = queue.shift();
-      if (i === 29 && j === 29) { // Stop when reaching the lower right corner (i.e. array[29][29])
-        break;
-      }
-  
-      // Check if the adjacent cells (up, down, left, and right) can be visited
-      if (i < 30 && array[i + 1][j] === 0 && !visited.has(`${i + 1},${j}`)) {
-        queue.push([i + 1, j]);
-        path[i + 1][j] = 1;
-        visited.add(`${i + 1},${j}`);
-      }
-      if (j < 30 && array[i][j + 1] === 0 && !visited.has(`${i},${j + 1}`)) {
-        queue.push([i, j + 1]);
-        path[i][j + 1] = 1;
-        visited.add(`${i},${j + 1}`);
-      }
-      if (i > 0 && array[i - 1][j] === 0 && !visited.has(`${i - 1},${j}`)) {
-        queue.push([i - 1, j]);
-        path[i - 1][j] = 1;
-        visited.add(`${i - 1},${j}`);
-      }
-      if (j > 0 && array[i][j - 1] === 0 && !visited.has(`${i},${j - 1}`)) {
-        queue.push([i, j - 1]);
-        path[i][j - 1] = 1;
-        visited.add(`${i},${j - 1}`);
-      }
-    }
-    return path;
-}
-
 // making way from entrance to exit
 function traceBack(lk, fitness, end) {
     const size_ = 30;
@@ -217,6 +172,13 @@ function drawArray(array) {
       }
     }
 }
+
+function drawSquare(x, y, w, h, color) {
+    var c = document.getElementById("canvas");
+    var ctx = c.getContext("2d");
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+}
   
 
 function process(input) {
@@ -232,6 +194,10 @@ function process(input) {
     const pathFinderResult = pathFinder(lines, [0, 0], [29, 29]);
     console.log("pathFinder path length: ", pathFinderResult[0]);
     console.log("pathFinder path solution: ", pathFinderResult[1]);
+    pathFinderResult[1].forEach(s => {
+        drawSquare(s[0]*30, s[1]*30, 30, 30, "yellow");
+    });
+
 }
 
 function previewFile() {
