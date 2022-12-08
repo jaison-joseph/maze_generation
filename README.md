@@ -17,9 +17,9 @@
 ![Alt text](images/no_solution_showing.PNG "No solution showing.")
 * Then, feel free to play around with the options to see the checkpoints, ordinary solution and solution with checkpoints! 
 * Here's one of the mazes generated using the program.
-![Alt text](images/m1.PNG "No solution showing.")
+![Alt text](images/m1.PNG "A result from the program")
 * Here's another one of the mazes.
-![Alt text](images/m2.PNG "No solution showing.")
+![Alt text](images/m2.PNG "A result from the program")
 ## Overview of the program
 
 * The program is based on the paper: D. Ashlock, C. Lee and C. McGuinness, "Search-Based Procedural Generation of Maze-Like Levels," in IEEE Transactions on Computational Intelligence and AI in Games, vol. 3, no. 3, pp. 260-273, Sept. 2011, doi: 10.1109/TCIAIG.2011.2138707.
@@ -49,3 +49,9 @@
     * Each such iteration is called a 'mating event'
     * 2000 mating events form a 'generation'
     * The paper uses 250 such generations to form the mazes.
+
+## Directory structure
+* The directory `pretty` contains code that turns the maze from a '1, 0, 1, 0, 0, ...' into this:
+![Alt text](images/m2.PNG "A result from the program")
+* The python files were used for debugging and initial development of `genetic_3.cpp`.
+* `reference/` is a fork of https://github.com/SebLague/Procedural-Cave-Generation.
