@@ -55,3 +55,6 @@
 ![Alt text](images/m2.PNG "A result from the program")
 * The python files were used for debugging and initial development of `genetic_3.cpp`.
 * `reference/` is a fork of https://github.com/SebLague/Procedural-Cave-Generation.
+
+## Special thanks
+* [Alexander Krohannon](https://soic.iupui.edu/people/alexander-krohannon/)
