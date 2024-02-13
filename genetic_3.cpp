@@ -31,6 +31,10 @@ const array<array<int, 2>, 4> checkpoints_ = {
 };
 array<array<int, size_>, size_> pathFinder_lk_;
 
+#ifdef DEBUG_COUNT
+unsigned long int debug_pathFinderCount = 0;
+#endif
+
 void init() {
     for (int i = 0 ; i < size_ ; ++i) {
         pathFinder_lk_[i].fill(1'000'000);
@@ -135,6 +139,11 @@ static inline void uniformCrossover(array<array<bool, size_>, size_>& m1, array<
 
 // returns min dist from entrance -> exit in maze
 // if no path, returns 1'000'000
+
+/**
+ * n1: changeed foo = {pt[0]+1, pt[1]}; to foo[0]=pt[0]+1 ; foo[1] = pt[1]
+ * n2: change foo from an array of 2 into two ints, x & y
+*/
 int pathFinder(
     array<array<bool, size_>, size_>& maze,
     array<int, 2> start, 
@@ -155,6 +164,11 @@ int pathFinder(
     array<int, 2> pt;
     array<int, 2> foo;
     int dist;
+    int x,y;
+    int e1, e2;
+
+    e1 = end[0];
+    e2 = end[1];
 
     while (q.size() > 0) {
         pt = q.back();
@@ -165,31 +179,39 @@ int pathFinder(
         if (dist > lk[end[0]][end[1]]) 
             continue;
 
-        foo = {pt[0]+1, pt[1]};
-        if (foo[0] < size_ && lk[foo[0]][foo[1]] > dist && !maze[foo[0]][foo[1]]) {
-            lk [foo[0]] [foo[1]] = dist;
-            if (foo != end)
-                q.push_back(foo);
+        // foo = {pt[0]+1, pt[1]};
+        x = pt[0]+1;
+        y = pt[1];
+        if (x < size_ && lk[x][y] > dist && !maze[x][y]) {
+            lk [x] [y] = dist;
+            if (x != e1 || y != e2)
+                q.push_back({x, y});
         }
 
-        foo = {pt[0], pt[1]+1};
-        if (foo[1] < size_ && lk[foo[0]][foo[1]] > dist && !maze[foo[0]][foo[1]]) {
-            lk [foo[0]] [foo[1]] = dist;
-            if (foo != end)
-                q.push_back(foo);
+        // foo = {pt[0], pt[1]+1};
+        x--;
+        y++;
+        if (y < size_ && lk[x][y] > dist && !maze[x][y]) {
+            lk [x] [y] = dist;
+            if (x != e1 || y != e2)
+                q.push_back({x, y});
         }
-        foo = {pt[0]-1, pt[1]};
-        if (foo[0] >= 0 && lk[foo[0]][foo[1]] > dist && !maze[foo[0]][foo[1]]) {
-            lk [foo[0]] [foo[1]] = dist;
-            if (foo != end)
-                q.push_back(foo);
+        // foo = {pt[0]-1, pt[1]};
+        x--;
+        y--;
+        if (x >= 0 && lk[x][y] > dist && !maze[x][y]) {
+            lk [x] [y] = dist;
+            if (x != e1 || y != e2)
+                q.push_back({x, y});
         }
 
-        foo = {pt[0], pt[1]-1};
-        if (foo[1] >= 0 && lk[foo[0]][foo[1]] > dist && !maze[foo[0]][foo[1]]) {
-            lk [foo[0]] [foo[1]] = dist;
-            if (foo != end)
-                q.push_back(foo);
+        // foo = {pt[0], pt[1]-1};
+        x++;
+        y--;
+        if (y >= 0 && lk[x][y] > dist && !maze[x][y]) {
+            lk [x] [y] = dist;
+            if (x != e1 || y != e2)
+                q.push_back({x, y});
         }
     }
 
@@ -236,8 +258,12 @@ int fitness_3(array<array<bool, size_>, size_>& maze) {
             else if (cache.find({path[i+1], path[i]}) != cache.end())
                 dist = cache[{path[i+1], path[i]}];
             else {
+                #ifdef DEBUG_COUNT
+                debug_pathFinderCount += 1;
+                #endif
                 dist = pathFinder(maze, path[i], path[i+1]);
                 cache[{path[i], path[i+1]}] = dist; 
+                // alsocache[path[i][0]][path[i][1]][path[i+1][0]][path[i+1][1]] = dist;
             }
             if (dist == 0) {
                 pathFailed = true;
@@ -487,6 +513,9 @@ void runner_4() {
             niceOnes.push_back(p);
         }
     }
+    #ifdef DEBUG_COUNT
+    cout << "pathfinder call count: " << debug_pathFinderCount << endl;
+    #endif
     saveMazes_2(niceOnes, label);
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);

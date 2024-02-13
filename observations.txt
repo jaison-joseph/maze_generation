@@ -13,3 +13,6 @@
 1:17 no floating point division: updated rng generator bounds and adjusted probability calculation
 
 at this point, -Ofast ~= -O3
+
+1:14 gettting rid of 2d arrays for indices in pathfinder
+    - it's called ~36 million times
