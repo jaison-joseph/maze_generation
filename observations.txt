@@ -1,0 +1,7 @@
+
+
+-O3  >  -Ofast
+
+2.58: original
+
+2:05 threadpool
