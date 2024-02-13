@@ -5,3 +5,11 @@
 2.58: original
 
 2:05 threadpool
+
+<= 2:00 single instance of the RNG
+
+1:50 inlines the mutation and crossover methods
+
+1:17 no floating point division: updated rng generator bounds and adjusted probability calculation
+
+at this point, -Ofast ~= -O3

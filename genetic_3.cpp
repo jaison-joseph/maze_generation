@@ -99,30 +99,32 @@ array<array<bool, size_>, size_> genMaze() {
     return maze;
 }
 
+random_device dev;
+mt19937 rng(dev());
+const uint_fast32_t rng_upper_bound_ = 1'000'000;
+uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // distribution in range [0, 64]
+const uint_fast32_t new_pm_ = rng_upper_bound_ * Pm_;
+const uint_fast32_t new_pc_ = rng_upper_bound_ * Pc_;
+
 // easier to divide by powers of 2
-void uniformMutation(array<array<bool, size_>, size_>& m) {
+static inline void uniformMutation(array<array<bool, size_>, size_>& m) {
      // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
-    random_device dev;
-    mt19937 rng(dev());
-    uniform_int_distribution<mt19937::result_type> getNum(0,64); // distribution in range [0, 64]
     for (auto&i : m) {
         for (auto& j : i) {
-            if ((float(getNum(rng))/64.0f) <= Pm_) {
+            if (getNum(rng) <= new_pm_) {
                 j = !j;
             }
         }
     }
 }
 
-void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
+static inline void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
      // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
-    random_device dev;
-    mt19937 rng(dev());
+    
     bool foo;
-    uniform_int_distribution<mt19937::result_type> getNum(0,64); // distribution in range [1, 64]
     for (int i = 0 ; i < size_ ; ++i) {
         for (int j = 0 ; j < size_ ; ++j) {
-            if (float(getNum(rng))/64.0f <= Pc_) {
+            if (getNum(rng) <= new_pc_) {
                 foo = m1[i][j];
                 m1[i][j] = m2[i][j];
                 m2[i][j] = foo;   
@@ -371,6 +373,7 @@ void runner_4() {
     std::array<std::thread, NUM_THREADS_> workers;
     thread_pool_init(workers);
 
+    auto randomDevice = mt19937{random_device{}()};
     for (int g = 0 ; g < generations_ ; ++g) {
         for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
         //    cout << m;
@@ -381,7 +384,7 @@ void runner_4() {
                 allIndices.begin(), allIndices.end(), 
                 back_inserter(indices),
                 7, 
-                mt19937{random_device{}()}
+                randomDevice
             );
 
             // cout << "\n indices: ";
