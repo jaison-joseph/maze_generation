@@ -10,6 +10,11 @@
 #include <string>
 #include <chrono>
 #include <thread>
+#if _WIN32
+#include <atomic>
+#elif __linux__
+#include <atomic>
+#endif
 
 using namespace std;
 
