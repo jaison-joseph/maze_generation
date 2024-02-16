@@ -36,6 +36,14 @@ const array<array<int, 2>, 4> checkpoints_ = {
 };
 array<array<int, size_>, size_> pathFinder_lk_;
 
+
+random_device dev;
+mt19937 rng(dev());
+const uint_fast32_t rng_upper_bound_ = 1'000'000;
+uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // distribution in range [1, 10**6]
+const uint_fast32_t new_pm_ = rng_upper_bound_ * Pm_;
+const uint_fast32_t new_pc_ = rng_upper_bound_ * Pc_;
+
 #ifdef DEBUG_COUNT
 unsigned long int debug_pathFinderCount = 0;
 #endif
@@ -108,12 +116,6 @@ array<array<bool, size_>, size_> genMaze() {
     return maze;
 }
 
-random_device dev;
-mt19937 rng(dev());
-const uint_fast32_t rng_upper_bound_ = 1'000'000;
-uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // distribution in range [1, 10**6]
-const uint_fast32_t new_pm_ = rng_upper_bound_ * Pm_;
-const uint_fast32_t new_pc_ = rng_upper_bound_ * Pc_;
 
 // easier to divide by powers of 2
 static inline void uniformMutation(array<array<bool, size_>, size_>& m) {
@@ -165,9 +167,10 @@ int pathFinder(
     array<array<int, size_>, size_> lk = pathFinder_lk_;
     lk[start[0]][start[1]] = 0;
 
-    vector<array<int, 2>> q = {{start}};
-    array<int, 2> pt;
-    array<int, 2> foo;
+    vector<int> q = {};
+    q.reserve(100);
+    q.push_back(start[0]);
+    q.push_back(start[1]);
     int dist;
     int x,y;
     int e1, e2;
@@ -176,21 +179,25 @@ int pathFinder(
     e2 = end[1];
 
     while (q.size() > 0) {
-        pt = q.back();
+        // pt = q.back()
+        y = q.back();
         q.pop_back();
-        dist = lk[pt[0]][pt[1]];
+        x = q.back();
+        q.pop_back();
+        dist = lk[x][y];
         dist += 1;
         
         if (dist > lk[end[0]][end[1]]) 
             continue;
 
         // foo = {pt[0]+1, pt[1]};
-        x = pt[0]+1;
-        y = pt[1];
+        x++;
         if (x < size_ && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
-            if (x != e1 || y != e2)
-                q.push_back({x, y});
+            if (x != e1 || y != e2) {
+                q.push_back(x);
+                q.push_back(y);
+            }
         }
 
         // foo = {pt[0], pt[1]+1};
@@ -198,16 +205,20 @@ int pathFinder(
         y++;
         if (y < size_ && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
-            if (x != e1 || y != e2)
-                q.push_back({x, y});
+            if (x != e1 || y != e2) {
+                q.push_back(x);
+                q.push_back(y);
+            }
         }
         // foo = {pt[0]-1, pt[1]};
         x--;
         y--;
         if (x >= 0 && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
-            if (x != e1 || y != e2)
-                q.push_back({x, y});
+            if (x != e1 || y != e2) {
+                q.push_back(x);
+                q.push_back(y);
+            }
         }
 
         // foo = {pt[0], pt[1]-1};
@@ -215,8 +226,10 @@ int pathFinder(
         y--;
         if (y >= 0 && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
-            if (x != e1 || y != e2)
-                q.push_back({x, y});
+            if (x != e1 || y != e2) {
+                q.push_back(x);
+                q.push_back(y);
+            }
         }
     }
 
@@ -326,20 +339,15 @@ void saveGenerationStats(array<array<int, populationSize_>, generations_>& stats
 
 const int NUM_THREADS_ = 7;
 bool termination_flag_ = false;
-#ifdef USE_REFERENCES
-    typedef array<array<array<bool, size_>, size_>, populationSize_> populationType;
-    typedef array<int, 7> outputType;
-    std::array<int, 7> threadInputs;
-#endif
+typedef array<array<array<bool, size_>, size_>, populationSize_> populationType;
+typedef array<int, 7> inputType;
+typedef array<int, 7> outputType;
+std::array<int, 7> threadInputs;
 
-#ifndef USE_REFERENCES
-    std::array<array<array<bool, size_>, size_>, NUM_THREADS_> threadInputs;
-    std::array<int, NUM_THREADS_> threadOutputs;
-#endif
 std::atomic<int> readyCount (0);
 std::atomic<int> iterCount (-1);
 
-void work(int x, populationType& population, outputType& output1, outputType& output2) {
+void work(int x, populationType& population, inputType& input, outputType& output1, outputType& output2) {
     int localitercount = 0;
     while(true) {
 
@@ -355,13 +363,7 @@ void work(int x, populationType& population, outputType& output1, outputType& ou
 
         // work
         // std::cout << x << std::endl;
-        #ifdef USE_REFERENCES
-            output1[x] = output2[x] = fitness_3(population[threadInputs[x]]);
-        #endif
-
-        #ifndef USE_REFERENCES
-            threadOutputs[x] = fitness_3(threadInputs[x]);
-        #endif
+        output1[x] = output2[x] = fitness_3(population[input[x]]);
 
         // std::this_thread::sleep_for(100ms);
         // std::this_thread::sleep_for (std::chrono::seconds(x));
@@ -371,9 +373,9 @@ void work(int x, populationType& population, outputType& output1, outputType& ou
     }
 }
 
-void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, populationType& population, outputType& output1, outputType& output2) {
+void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, populationType& population, inputType& input, outputType& output1, outputType& output2) {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
-        workers[i] = std::thread(work, i, ref(population), ref(output1), ref(output2));
+        workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1), ref(output2));
     }
     // cout << " initialization done";
 }
@@ -421,71 +423,52 @@ void runner_4() {
 
 
     std::array<std::thread, NUM_THREADS_> workers;
-    #ifdef USE_REFERENCES
-    thread_pool_init(workers, ref(population), ref(fitnesses), ref(sortedFitnesses));
-    #endif
+    thread_pool_init(workers, ref(population), ref(indices), ref(fitnesses), ref(sortedFitnesses));
     
-    #ifndef USE_REFERENCES
-    thread_pool_init(workers);
-    #endif
-    
-
     auto randomDevice = mt19937{random_device{}()};
     const int numIterations_ = generations_ * matingEventsPerGeneration_;
     random_device sample_dev;
     mt19937 sample_rng(sample_dev());
     uniform_int_distribution<mt19937::result_type> sample_getNum(0,populationSize_-1); // distribution in range [1, 10**6]
+    
+    // for (int i = 0 ; i < 7 ; i++) {
+    //     threadInputs[i] = indices[i] = sample_getNum(sample_rng);
+    // }
+    
     for (int g = 0 ; g < numIterations_ ; ++g) {
-        // for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
-        //    cout << m;
-            // indices.clear();
-            // indices.reserve(7);
-            // https://en.cppreference.com/w/cpp/algorithm/sample
-            // randomly select 7 indices from the population array
-            // sample(
-            //     allIndices.begin(), allIndices.end(), 
-            //     back_inserter(indices),
-            //     7, 
-            //     randomDevice
-            // );
-            for (int i = 0 ; i < 7 ; i++) {
-                indices[i] = sample_getNum(sample_rng);
-            }
+            // for (int i = 0 ; i < 7 ; i++) {
+            //     indices[i] = sample_getNum(sample_rng);
+            // }
             
             // cout << "\n indices: ";
             // for (auto&x : indices)
             //     cout << x << ", ";
-            
-            // find the fitness of the 7 population members
 
-            // auto start = chrono::steady_clock::now();
-            // for (int i = 0 ; i < 7 ; ++i) {
-            //     sortedFitnesses[i] = fitnesses[i] = fitness_3(population[indices[i]]);
+            for (int i = 0 ; i < 7 ; i++) {
+                indices[i] = sample_getNum(sample_rng);
+            }
+
+            // for (int i = 0 ; i < 7 ; i++) {
+            //     threadInputs[i] = indices[i];
+            // }            
+
+            // for (int i = 0 ; i < 7 ; i++) {
+            //     threadInputs[i] = indices[i];
             // }
-
-            #ifdef USE_REFERENCES
-                for (int i = 0 ; i < 7 ; i++) {
-                    threadInputs[i] = indices[i];
-                }
-            #endif
-            #ifndef USE_REFERENCES
-                for (int i = 0 ; i < 7 ; ++i) {
-                    threadInputs[i] = population[indices[i]];
-                }
-            #endif
 
             thread_pool_launch_iteration();
 
+            // for (int i = 0 ; i < 7 ; i++) {
+            //     indices[i] = sample_getNum(sample_rng);
+            // }
+
+            // for (int i = 0 ; i < 7 ; i++) {
+            //     threadInputs[i] = indices[i];
+            // }
+
             thread_pool_wait_iteration_completion();
 
-            #ifdef USE_REFERENCES
-                
-            #endif
-            #ifndef USE_REFERENCES
-                for (int i = 0 ; i < 7 ; ++i) {
-                    sortedFitnesses[i] = fitnesses[i] = threadOutputs[i];
-                }
-            #endif
+            // since we passed a ref of outputs to each thread, no copying from threadOutput -> wherever it was supposed to be
 
             // auto end = chrono::steady_clock::now();
             // auto diff = end-start;
