@@ -16,3 +16,10 @@ at this point, -Ofast ~= -O3
 
 1:14 gettting rid of 2d arrays for indices in pathfinder
     - it's called ~36 million times
+
+-O2 performs better on M2
+but -O3 with mcpu does best overall {-O2 | -O3: -mcpu=apple-m2 | N/A }
+-funroll-loops doesn't do anything
+
+~1:12:500 using pointers
+

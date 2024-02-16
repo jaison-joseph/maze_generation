@@ -1,0 +1,54 @@
+jaison@Jaisons-Laptop maze_generation % g++ -std=c++17 -O2 -Wl,-stack_size -Wl,0x1000000 -pthread genetic_3.cpp -o executable/o2_no_mcpu
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu 
+./executable/o2_no_mcpu  511.28s user 0.27s system 793% cpu 1:04.45 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+./executable/o2_no_mcpu  587.14s user 0.33s system 793% cpu 1:14.02 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+^C
+./executable/o2_no_mcpu  29.77s user 0.02s system 792% cpu 3.757 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+./executable/o2_no_mcpu  558.17s user 0.28s system 793% cpu 1:10.42 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+./executable/o2_no_mcpu  587.09s user 0.29s system 796% cpu 1:13.75 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+./executable/o2_no_mcpu  565.86s user 0.35s system 794% cpu 1:11.25 total
+jaison@Jaisons-Laptop maze_generation % g++ -std=c++17 -O2 -mcpu=apple-m2 -Wl,-stack_size -Wl,0x1000000 -pthread genetic_3.cpp -o executable/o2_with_mcpu
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_with_mcpu                                                                                   
+./executable/o2_with_mcpu  553.18s user 0.27s system 795% cpu 1:09.55 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_with_mcpu
+./executable/o2_with_mcpu  586.38s user 0.29s system 796% cpu 1:13.66 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_with_mcpu
+./executable/o2_with_mcpu  576.61s user 0.28s system 796% cpu 1:12.46 total
+jaison@Jaisons-Laptop maze_generation % g++ -std=c++17 -O3 -mcpu=apple-m2 -Wl,-stack_size -Wl,0x1000000 -pthread genetic_3.cpp -o executable/o3_with_mcpu
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_with_mcpu                                                                                  
+./executable/o3_with_mcpu  546.87s user 0.27s system 794% cpu 1:08.86 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_with_mcpu
+./executable/o3_with_mcpu  554.32s user 0.27s system 796% cpu 1:09.61 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_with_mcpu
+./executable/o3_with_mcpu  518.36s user 0.25s system 796% cpu 1:05.11 total
+jaison@Jaisons-Laptop maze_generation % g++ -std=c++17 -O3 -Wl,-stack_size -Wl,0x1000000 -pthread genetic_3.cpp -o executable/o3_no_mcpu  
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_no_mcpu                                                                    
+./executable/o3_no_mcpu  540.18s user 0.26s system 795% cpu 1:07.91 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_no_mcpu
+./executable/o3_no_mcpu  553.55s user 0.27s system 795% cpu 1:09.63 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_no_mcpu
+./executable/o3_no_mcpu  542.66s user 0.27s system 796% cpu 1:08.18 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+./executable/o2_no_mcpu  549.16s user 0.27s system 796% cpu 1:08.97 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+./executable/o2_no_mcpu  531.44s user 0.26s system 795% cpu 1:06.85 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_no_mcpu
+./executable/o2_no_mcpu  573.01s user 0.28s system 796% cpu 1:11.96 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_with_mcpu
+./executable/o2_with_mcpu  566.81s user 0.28s system 796% cpu 1:11.22 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_with_mcpu
+./executable/o2_with_mcpu  569.44s user 0.28s system 796% cpu 1:11.53 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o2_with_mcpu
+./executable/o2_with_mcpu  524.29s user 0.26s system 795% cpu 1:05.92 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_with_mcpu
+./executable/o3_with_mcpu  533.75s user 0.26s system 796% cpu 1:07.03 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_with_mcpu
+./executable/o3_with_mcpu  507.85s user 0.25s system 796% cpu 1:03.79 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_with_mcpu
+./executable/o3_with_mcpu  533.43s user 0.26s system 796% cpu 1:06.99 total
+jaison@Jaisons-Laptop maze_generation % time ./executable/o3_with_mcpu

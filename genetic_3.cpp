@@ -111,7 +111,7 @@ array<array<bool, size_>, size_> genMaze() {
 random_device dev;
 mt19937 rng(dev());
 const uint_fast32_t rng_upper_bound_ = 1'000'000;
-uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // distribution in range [0, 64]
+uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // distribution in range [1, 10**6]
 const uint_fast32_t new_pm_ = rng_upper_bound_ * Pm_;
 const uint_fast32_t new_pc_ = rng_upper_bound_ * Pc_;
 
@@ -322,15 +322,24 @@ void saveGenerationStats(array<array<int, populationSize_>, generations_>& stats
     myfile.close();
 }
 
+#define USE_REFERENCES 1;
 
 const int NUM_THREADS_ = 7;
 bool termination_flag_ = false;
-std::array<array<array<bool, size_>, size_>, NUM_THREADS_> threadInputs;
-std::array<int, NUM_THREADS_> threadOutputs;
+#ifdef USE_REFERENCES
+    typedef array<array<array<bool, size_>, size_>, populationSize_> populationType;
+    typedef array<int, 7> outputType;
+    std::array<int, 7> threadInputs;
+#endif
+
+#ifndef USE_REFERENCES
+    std::array<array<array<bool, size_>, size_>, NUM_THREADS_> threadInputs;
+    std::array<int, NUM_THREADS_> threadOutputs;
+#endif
 std::atomic<int> readyCount (0);
 std::atomic<int> iterCount (-1);
 
-void work(int x) {
+void work(int x, populationType& population, outputType& output1, outputType& output2) {
     int localitercount = 0;
     while(true) {
 
@@ -346,7 +355,13 @@ void work(int x) {
 
         // work
         // std::cout << x << std::endl;
-        threadOutputs[x] = fitness_3(threadInputs[x]);
+        #ifdef USE_REFERENCES
+            output1[x] = output2[x] = fitness_3(population[threadInputs[x]]);
+        #endif
+
+        #ifndef USE_REFERENCES
+            threadOutputs[x] = fitness_3(threadInputs[x]);
+        #endif
 
         // std::this_thread::sleep_for(100ms);
         // std::this_thread::sleep_for (std::chrono::seconds(x));
@@ -356,9 +371,9 @@ void work(int x) {
     }
 }
 
-void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers) {
+void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, populationType& population, outputType& output1, outputType& output2) {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
-        workers[i] = std::thread(work, i);
+        workers[i] = std::thread(work, i, ref(population), ref(output1), ref(output2));
     }
     // cout << " initialization done";
 }
@@ -384,40 +399,59 @@ void thread_pool_terminate(std::array<std::thread, NUM_THREADS_>& workers) {
 }
 
 // only save the mazes with fitness > 0
+// r0: original
+// r1: change the double loop to a single loop
 void runner_4() {
     array<array<array<bool, size_>, size_>, populationSize_> population;
     for (auto& p : population)
         p = genMaze();
     array<int, 7> fitnesses;
     array<int, 7> sortedFitnesses;
-    vector<int> indices;
+    array<int, 7> indices;
     array<array<bool, size_>, size_> m1;
     array<array<bool, size_>, size_> m2;
     // indices of the two fittest members, then the two weakest members
     int i1, i2, i3, i4;
     string label;
-    array<int, populationSize_> allIndices;
-    // fills allIndices with numbers starting from 0
+    // array<int, populationSize_> allIndices;
+    // fills allIndices with numbers starting from 0, incrementally 
+    // i.e. [0, 1, .... allIndices.size() - 1]
     // https://stackoverflow.com/questions/4803898/fill-in-the-int-array-from-zero-to-defined-number
-    iota(allIndices.begin(), allIndices.end(), 0);
+    // iota(allIndices.begin(), allIndices.end(), 0);
+
 
     std::array<std::thread, NUM_THREADS_> workers;
+    #ifdef USE_REFERENCES
+    thread_pool_init(workers, ref(population), ref(fitnesses), ref(sortedFitnesses));
+    #endif
+    
+    #ifndef USE_REFERENCES
     thread_pool_init(workers);
+    #endif
+    
 
     auto randomDevice = mt19937{random_device{}()};
-    for (int g = 0 ; g < generations_ ; ++g) {
-        for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
+    const int numIterations_ = generations_ * matingEventsPerGeneration_;
+    random_device sample_dev;
+    mt19937 sample_rng(sample_dev());
+    uniform_int_distribution<mt19937::result_type> sample_getNum(0,populationSize_-1); // distribution in range [1, 10**6]
+    for (int g = 0 ; g < numIterations_ ; ++g) {
+        // for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
         //    cout << m;
-            indices.clear();
+            // indices.clear();
+            // indices.reserve(7);
             // https://en.cppreference.com/w/cpp/algorithm/sample
             // randomly select 7 indices from the population array
-            sample(
-                allIndices.begin(), allIndices.end(), 
-                back_inserter(indices),
-                7, 
-                randomDevice
-            );
-
+            // sample(
+            //     allIndices.begin(), allIndices.end(), 
+            //     back_inserter(indices),
+            //     7, 
+            //     randomDevice
+            // );
+            for (int i = 0 ; i < 7 ; i++) {
+                indices[i] = sample_getNum(sample_rng);
+            }
+            
             // cout << "\n indices: ";
             // for (auto&x : indices)
             //     cout << x << ", ";
@@ -429,17 +463,29 @@ void runner_4() {
             //     sortedFitnesses[i] = fitnesses[i] = fitness_3(population[indices[i]]);
             // }
 
-            for (int i = 0 ; i < 7 ; ++i) {
-                threadInputs[i] = population[indices[i]];
-            }
+            #ifdef USE_REFERENCES
+                for (int i = 0 ; i < 7 ; i++) {
+                    threadInputs[i] = indices[i];
+                }
+            #endif
+            #ifndef USE_REFERENCES
+                for (int i = 0 ; i < 7 ; ++i) {
+                    threadInputs[i] = population[indices[i]];
+                }
+            #endif
 
             thread_pool_launch_iteration();
 
             thread_pool_wait_iteration_completion();
 
-            for (int i = 0 ; i < 7 ; ++i) {
-                sortedFitnesses[i] = fitnesses[i] = threadOutputs[i];
-            }
+            #ifdef USE_REFERENCES
+                
+            #endif
+            #ifndef USE_REFERENCES
+                for (int i = 0 ; i < 7 ; ++i) {
+                    sortedFitnesses[i] = fitnesses[i] = threadOutputs[i];
+                }
+            #endif
 
             // auto end = chrono::steady_clock::now();
             // auto diff = end-start;
@@ -500,7 +546,7 @@ void runner_4() {
             population[indices[i3]] = m1;
             population[indices[i4]] = m2;
 
-        }
+        // }
         // cout << "\n sortedFitnesses: " << sortedFitnesses;
     //    label = "\n";
     //    label += "-----------------------------";
