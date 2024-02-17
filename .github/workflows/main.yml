@@ -1,0 +1,30 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ devops ]
+
+jobs:
+  Deploy:
+    name: Deploy to EC2
+    runs-on: self-hosted
+    
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & Deploy
+        env:
+            PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+            HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
+            USER_NAME: ${{secrets.EC2_USERNAME}}
+      
+        run: |
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME} '
+
+              # Now we have got the access of EC2 and we will start the deploy .
+              cd /home/ubuntu/maze-generation &&
+              git checkout devops &&
+              git fetch --all &&
+              git reset --hard origin/devops &&
+              git pull origin devops
+              '
