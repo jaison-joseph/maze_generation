@@ -7,11 +7,16 @@ on:
 jobs:
   Deploy:
     name: Deploy to EC2
-    runs-on: Jaisons-Laptop
+    runs-on: [self-hosted, Jaisons-Laptop]
     
     steps:
-      - uses: actions/checkout@v4
-      - name: Build & Deploy
+
+      - name: Basic check 
+        run: |
+          echo "hello there"
+
+      - name: Checkout
+        uses: actions/checkout@v4
         env:
             PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
             HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
