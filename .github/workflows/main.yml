@@ -29,5 +29,5 @@ jobs:
           HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
           USER_NAME: ${{secrets.EC2_USERNAME}}
         run: |
-        ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME}
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME}
 
