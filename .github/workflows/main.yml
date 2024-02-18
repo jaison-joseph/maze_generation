@@ -8,7 +8,7 @@ on:
 jobs:
   Deploy: # this is the key that groups all thejobs in the workflow file
     name: Deploy to EC2
-    runs-on: [self-hosted, Jaisons-Laptop]
+    runs-on: Jaisons-Laptop
     
     steps:
 
