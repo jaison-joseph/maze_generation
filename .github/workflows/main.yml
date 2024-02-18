@@ -19,12 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Pull and send
+      - name: Get PK
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+        run: echo ${PRIVATE_KEY} > private_key && chmod 600 private_key && \
+        
+      - name: ssh
+        env:
           HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
           USER_NAME: ${{secrets.EC2_USERNAME}}
-      
-        run: echo ${PRIVATE_KEY} > private_key && chmod 600 private_key
-        run: ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME}
+        run:
+        ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME}
 
