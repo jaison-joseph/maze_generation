@@ -2,10 +2,11 @@ name: Deploy
 
 on:
   push:
-    branches: [ devops ]
+    branches: 
+      - devops 
 
 jobs:
-  Deploy:
+  Deploy: # this is the key that groups all thejobs in the workflow file
     name: Deploy to EC2
     runs-on: [self-hosted, Jaisons-Laptop]
     
@@ -17,10 +18,12 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+      
+      - name: Pull and send
         env:
-            PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
-            HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
-            USER_NAME: ${{secrets.EC2_USERNAME}}
+          PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+          HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
+          USER_NAME: ${{secrets.EC2_USERNAME}}
       
         run: |
           echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
