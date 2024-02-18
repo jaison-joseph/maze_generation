@@ -7,7 +7,7 @@ on:
 
 jobs:
   Deploy: # this is the key that groups all thejobs in the workflow file
-    name: Deploy to EC2
+    name: Deploy_to_EC2
     runs-on: self-hosted
     
     steps:
