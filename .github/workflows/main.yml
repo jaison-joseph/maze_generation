@@ -38,5 +38,4 @@ jobs:
             git checkout devops &&
             git fetch --all &&
             git reset --hard origin/devops &&
-            git pull origin devops
-            '
+            git pull origin devops '
