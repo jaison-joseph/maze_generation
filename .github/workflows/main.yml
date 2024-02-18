@@ -16,23 +16,23 @@ jobs:
         run: |
           echo "hello there backgroud"
 
-      # - name: Checkout
-      #   uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       
-      # - name: Pull and send
-      #   env:
-      #     PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
-      #     HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
-      #     USER_NAME: ${{secrets.EC2_USERNAME}}
+      - name: Pull and send
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+          HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
+          USER_NAME: ${{secrets.EC2_USERNAME}}
       
-      #   run: |
-      #     echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
-      #     ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME} '
+        run: |
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME} '
 
-      #         # Now we have got the access of EC2 and we will start the deploy .
-      #         cd /home/ubuntu/maze-generation &&
-      #         git checkout devops &&
-      #         git fetch --all &&
-      #         git reset --hard origin/devops &&
-      #         git pull origin devops
-      #         '
+              # Now we have got the access of EC2 and we will start the deploy .
+              cd /home/ubuntu/maze-generation &&
+              git checkout devops &&
+              git fetch --all &&
+              git reset --hard origin/devops &&
+              git pull origin devops
+              '
