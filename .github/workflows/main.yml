@@ -26,7 +26,7 @@ jobs:
         
       - name: ssh
         env:
-          HOSTNAME: ${{secrets.SSH_HOST_ADDRESS}}
+          HOSTNAME: ${{secrets.EC2_HOST_ADDRESS}}
           USER_NAME: ${{secrets.EC2_USERNAME}}
         run: |
           ssh -o StrictHostKeyChecking=no -i private_key ${USER_NAME}@${HOSTNAME}
