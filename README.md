@@ -31,7 +31,7 @@
     * Let's go on a short detour to talk about 'fitness':
         * Remember that this is an evolutionary algorithm. In nature, it's all survival of the fittest.
         * So, we need to evaulate the fitness of a maze. I'll talk about the simplest fitness expression used in the paper:
-            * The paper cites 'checkpoints' to be placed at random places in the maze, since the algorithm tends to create 'direct' solutions from the start to the end, and that's no fun.
+            * The paper cites 'checkpoints' (the red squares in the images above) to be placed at random places in the maze, since the algorithm tends to create 'direct' solutions from the start to the end, and that's no fun.
             * The algorithm is supposed to prefer mazes that have a path going through all the checkpoints. So our 'evolution' is biased to select more 'fun' mazes in a sense. 
             * The default checkpoints are (6, 24), (12, 18), (18, 12) and (24, 6)
             * If the maze does not have any such path from the entrance to the exit passing through all the checkpoints, its fitness is 0.
