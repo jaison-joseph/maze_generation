@@ -196,7 +196,7 @@ int pathFinder(
     return lk[end[0]][end[1]] == 1'000'000 ? 0 : lk[end[0]][end[1]];
 }
 
-// so apparently I overthought the fitness function godammit
+// so apparently I overthought the fitness function 
 // maze[i][j] is true => wall, false => empty
 // this version adds cache 
 int fitness_3(array<array<bool, size_>, size_>& maze) {
