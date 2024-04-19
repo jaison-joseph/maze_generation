@@ -117,9 +117,7 @@ array<array<bool, size_>, size_> genMaze() {
 }
 
 
-// easier to divide by powers of 2
 static inline void uniformMutation(array<array<bool, size_>, size_>& m) {
-     // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
     for (auto&i : m) {
         for (auto& j : i) {
             if (getNum(rng) <= new_pm_) {
@@ -130,7 +128,6 @@ static inline void uniformMutation(array<array<bool, size_>, size_>& m) {
 }
 
 static inline void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
-     // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
     
     bool foo;
     for (int i = 0 ; i < size_ ; ++i) {
@@ -238,7 +235,7 @@ int pathFinder(
     return lk[end[0]][end[1]] == 1'000'000 ? 0 : lk[end[0]][end[1]];
 }
 
-// so apparently I overthought the fitness function godammit
+// so apparently I overthought the fitness function
 // maze[i][j] is true => wall, false => empty
 // this version adds cache 
 int fitness_3(array<array<bool, size_>, size_>& maze) {
@@ -415,11 +412,6 @@ void runner_4() {
     // indices of the two fittest members, then the two weakest members
     int i1, i2, i3, i4;
     string label;
-    // array<int, populationSize_> allIndices;
-    // fills allIndices with numbers starting from 0, incrementally 
-    // i.e. [0, 1, .... allIndices.size() - 1]
-    // https://stackoverflow.com/questions/4803898/fill-in-the-int-array-from-zero-to-defined-number
-    // iota(allIndices.begin(), allIndices.end(), 0);
 
 
     std::array<std::thread, NUM_THREADS_> workers;
@@ -431,40 +423,14 @@ void runner_4() {
     mt19937 sample_rng(sample_dev());
     uniform_int_distribution<mt19937::result_type> sample_getNum(0,populationSize_-1); // distribution in range [1, 10**6]
     
-    // for (int i = 0 ; i < 7 ; i++) {
-    //     threadInputs[i] = indices[i] = sample_getNum(sample_rng);
-    // }
-    
     for (int g = 0 ; g < numIterations_ ; ++g) {
-            // for (int i = 0 ; i < 7 ; i++) {
-            //     indices[i] = sample_getNum(sample_rng);
-            // }
-            
-            // cout << "\n indices: ";
-            // for (auto&x : indices)
-            //     cout << x << ", ";
 
             for (int i = 0 ; i < 7 ; i++) {
                 indices[i] = sample_getNum(sample_rng);
             }
 
-            // for (int i = 0 ; i < 7 ; i++) {
-            //     threadInputs[i] = indices[i];
-            // }            
-
-            // for (int i = 0 ; i < 7 ; i++) {
-            //     threadInputs[i] = indices[i];
-            // }
-
             thread_pool_launch_iteration();
 
-            // for (int i = 0 ; i < 7 ; i++) {
-            //     indices[i] = sample_getNum(sample_rng);
-            // }
-
-            // for (int i = 0 ; i < 7 ; i++) {
-            //     threadInputs[i] = indices[i];
-            // }
 
             thread_pool_wait_iteration_completion();
 
@@ -478,13 +444,6 @@ void runner_4() {
             // find the fittest two members
             // the fitnesses are sorted in descending order
             sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
-
-            // cout << "\n fitnesses: ";
-            // for (auto&x : fitnesses)
-            //     cout << x << ", ";
-
-            // for (auto&x : sortedFitnesses)
-            //     cout << x << ", ";
 
             // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
             // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
@@ -558,11 +517,6 @@ void runner_4() {
 // g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o a
 int main() {
     init();
-    // testPathFinder();
-    // auto start = chrono::steady_clock::now();
     runner_4();
-    // auto end = chrono::steady_clock::now();
-    // auto diff = end - start;
-    // cout << "\n time: " << chrono::duration<double, milli>(diff).count() << " ms";
     return 0;
 }
