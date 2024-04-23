@@ -9,7 +9,9 @@
 * Clone the repo
 * cd into the directory
 * Compile `genetic_3.cpp` with the following options: 
-    g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o `executable_name`
+    * For windows: g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o `executable_name`
+    * For clang on OSX, use: g++ -std=c++17 -O3 -pthread -Wl,-stack_size,0x1000000 genetic_3.cpp `executable_name`
+    * g++ on Linux: gcc -std=c++17 -pthread -O3 -Wl,-z,stack-size=16777216 genetic_3.cpp -o win2024
 * The program will generate mazes upto 120 in number of size 30*30, most of which will have a path from the upper left corner to the lower right corner.
 * The mazes will be written into `genetic_3_results_save_2.txt`, stored as a 30*30 csv of 1's and 0's. Copy one of the mazes into a separate file. For an example of what that would look like, look at the contents of `pretty/demo_1.txt`.
 * Then load up `pretty/index.html` on your browser, and choose the newly created file containing that one maze using the **Choose file** button. 
