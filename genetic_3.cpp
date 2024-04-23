@@ -13,31 +13,57 @@
 
 using namespace std;
 
+// the length and width of the mazes
 const int size_= 30;
+
+// the number of mazes in a population
 const int populationSize_ = 120;
+
+// probability of uniform crossover
 const float Pc_ = 0.05;
+
+// probability of uniform mutation
 const float Pm_ = 0.01;
+
+// initial probability used to create the starting population
 const float fill_ = 0.05;
+
+// total number of generations for the program
 const int generations_ = 250;
+
+// each iteration of algorithm is a matingEvent, 
+// a bunch of such events constitutes a generation
 const int matingEventsPerGeneration_ = 2000;
+
+// helper constant
 const int totalMatingEvents_ = generations_ * matingEventsPerGeneration_;
+
+// start indices of the entire maze
 const array<int, 2> entrance_ = {0, 0};
+
+// end indices of the entire maze
 const array<int, 2> exit_ = {size_-1, size_-1};
+
+// the checkpoints along the maze that the algorithm must have a path along
 const array<array<int, 2>, 4> checkpoints_ = {
     array<int, 2> {6, 24},
     array<int, 2> {12, 18},
     array<int, 2> {18, 12},
     array<int, 2> {24, 6}
 };
+
+// this stores the default values used for the depth-first search
 array<array<int, size_>, size_> pathFinderLookupDefault_;
 
+// called at the start of the run function of the program
+// used to initialize all variables
 void init() {
     for (int i = 0 ; i < size_ ; ++i) {
         pathFinderLookupDefault_[i].fill(1'000'000);
     }
 }
 
-// overload of << for a maze
+// helper: overload of << for a maze
 ostream& operator<<(ostream& os, array<array<bool, size_>, size_>& m) {
     for (array<bool, size_>&i : m) {
         for (bool j : i) {
@@ -49,7 +75,7 @@ ostream& operator<<(ostream& os, array<array<bool, size_>, size_>& m) {
     return os;
 }
 
-// overload for lookup in the pathfinder
+// helper: overload for lookup in the pathfinder
 ostream& operator<<(ostream& os, array<array<int, size_>, size_>& m) {
     for (array<int, size_>&i : m) {
         for (int j : i) {
@@ -61,21 +87,21 @@ ostream& operator<<(ostream& os, array<array<int, size_>, size_>& m) {
     return os;
 }
 
-// overload of << for an int array of size 2 used as indices in this program
+// helper: overload of << for an int array of size 2 used as indices in this program
 ostream& operator<<(ostream& os, array<int, 2>& m) {
     os << '(' << m[0] << ", " << m[1] << ')';
     // os << dt.mo << '/' << dt.da << '/' << dt.yr;
     return os;
 }
 
-// overload of << for an int array of size 7 in the mating event population selection for 'evolution'
+// helper: overload of << for an int array of size 7 in the mating event population selection for 'evolution'
 ostream& operator<<(ostream& os, array<int, 7>& m) {
     os << m[0] << ", " << m[1] << ", " << m[2] << ", " << m[3] << ", " << m[4] << ", " << m[5] << ", " << m[6];
     // os << dt.mo << '/' << dt.da << '/' << dt.yr;
     return os;
 }
 
-// overload of << for vector of int type
+// helper: overload of << for vector of int type
 ostream& operator<<(ostream& os, vector<int>& x) {
     for (int& i : x) {
         os << i << ", ";
@@ -85,6 +111,7 @@ ostream& operator<<(ostream& os, vector<int>& x) {
     return os;
 }
 
+// this function is used to generate the initial popluation of mazes before we perform evolution
 array<array<bool, size_>, size_> genMaze() {
     // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
     random_device dev;
@@ -99,15 +126,16 @@ array<array<bool, size_>, size_> genMaze() {
     return maze;
 }
 
-// easier to divide by powers of 2
+// this function flips the cells between two mazes provided as arguments
+// with a probability of 0.01
 void uniformMutation(array<array<bool, size_>, size_>& m) {
      // https://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c
     random_device dev;
     mt19937 rng(dev());
-    uniform_int_distribution<mt19937::result_type> getNum(0,64); // distribution in range [0, 64]
+    uniform_int_distribution<mt19937::result_type> getNum(1,100); // distribution in range [0, 64]
     for (auto&i : m) {
         for (auto& j : i) {
-            if ((float(getNum(rng))/64.0f) <= Pm_) {
+            if ((float(getNum(rng))/100.0f) <= Pm_) {
                 j = !j;
             }
         }
@@ -119,10 +147,10 @@ void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, si
     random_device dev;
     mt19937 rng(dev());
     bool foo;
-    uniform_int_distribution<mt19937::result_type> getNum(0,64); // distribution in range [1, 64]
+    uniform_int_distribution<mt19937::result_type> getNum(1,100); // distribution in range [1, 64]
     for (int i = 0 ; i < size_ ; ++i) {
         for (int j = 0 ; j < size_ ; ++j) {
-            if (float(getNum(rng))/64.0f <= Pc_) {
+            if (float(getNum(rng))/100.0f <= Pc_) {
                 foo = m1[i][j];
                 m1[i][j] = m2[i][j];
                 m2[i][j] = foo;   
@@ -131,8 +159,12 @@ void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, si
     }
 }
 
-// returns min dist from entrance -> exit in maze
-// if no path, returns 1'000'000
+// returns min dist between two points in a maze
+// the algorithm is DFS, but it doesn't return immediately as soon as it reaches the exit 
+// since other, shorter paths might exist
+
+// TODO: replace with bfs (should work theoretically, but DFS might fare better when mazes are non-sparse)
+// if no path, returns 0
 int pathFinder(
     array<array<bool, size_>, size_>& maze,
     array<int, 2> start, 
@@ -195,9 +227,35 @@ int pathFinder(
     return lk[end[0]][end[1]] == 1'000'000 ? 0 : lk[end[0]][end[1]];
 }
 
-// so apparently I overthought the fitness function 
 // maze[i][j] is true => wall, false => empty
 // this version adds cache 
+
+/**
+ * 
+ * The goal of this function is to find the fitness of the maze
+ * The fitness is simply the shortest path from the upper left corner (entracne)
+ * to the lower right corner (exit) of the maze that goes through all the checkpoints
+ * 
+ * Since we use a modified depth-first search (DFS*) to find the distance between two points in a maze,
+ * if the maze is sparsely filled, the "breadth" of the search beyond a certain depth makes
+ * the DFS "slow" for our purposes. The solution instead is to:
+ * 
+ * Replace (entrance)  < --- DFS* -- >  (exit)
+ * 
+ *          with
+ * 
+ * min(
+ *      (entrance) <---DFS*--> (chkpt 1) <---DFS*--> (chkpt 2)  <---DFS*--> (chkpt 3)  <---DFS*--> (chkpt 4)  <---DFS*--> (exit),
+ *      (entrance) <---DFS*--> (chkpt 2) <---DFS*--> (chkpt 1)  <---DFS*--> (chkpt 3)  <---DFS*--> (chkpt 4)  <---DFS*--> (exit),
+ *      .... (we try all permutations of the 4 checkpoints between the entrance and exit)
+ * )
+ * 
+ * The above is much more performant compared to the simple (entrance)  < --- DFS* -- >  (exit) search
+ * 
+ * Since the modified algorithm for calculating fitness has a lot of redundancies,
+ * like (chkpt 1) <---DFS*--> (chkpt 2) and (chkpt 2) <---DFS*--> (chkpt 1), 
+ * we cache such intermediate results to avoid redundant calculations
+*/
 int fitness_3(array<array<bool, size_>, size_>& maze) {
     
     if (maze[entrance_[0]][entrance_[1]]) {
@@ -253,6 +311,7 @@ int fitness_3(array<array<bool, size_>, size_>& maze) {
     return bestResult;
 }
 
+// helper method to write the results to a text file
 void saveMazes_2(vector<array<array<bool, size_>, size_>>& mazes, string label) {
     ofstream myfile;
     myfile.open ("genetic_3_results_save_2.txt");
@@ -264,7 +323,7 @@ void saveMazes_2(vector<array<array<bool, size_>, size_>>& mazes, string label) 
 }
 
 
-// void saveMatingEventStats(vector<vector<int>>& stats) {
+// helper method for debugging
 void saveMatingEventStats(array<array<int, 7>, totalMatingEvents_>& stats) {
     ofstream myfile;
     myfile.open ("matingEventStats.txt");
@@ -273,8 +332,7 @@ void saveMatingEventStats(array<array<int, 7>, totalMatingEvents_>& stats) {
     }
     myfile.close();
 }
-
-// void saveGenerationStats(vector<vector<int>>& stats) {
+// helper method for debugging
 void saveGenerationStats(array<array<int, populationSize_>, generations_>& stats) {
     ofstream myfile;
     myfile.open ("generationStats.txt");
@@ -287,7 +345,22 @@ void saveGenerationStats(array<array<int, populationSize_>, generations_>& stats
     myfile.close();
 }
 
-// only save the mazes with fitness > 0
+/**
+ * 
+ * The heart of the program, here's the outline:
+ * 1. initialize the population of mazes (done using the genMaze function)
+ * 2. for each mating event:
+ *      3. pick 7 mazes out of the population
+ *      4. find the fitnesses of the selected 7
+ *      5. copy the strongest two, and perform:
+ *          6. Uniform crossover
+ *             followed by,
+ *          7. Uniform mutation
+ * 
+ *      8. Overwrite the weakest 2 among the selected 7, and overwrite it 
+ *          with the (modified) strongest two
+ * 9. repeat steps 2-8, for mating events per generation * number of generations
+*/
 void runner_4() {
     array<array<array<bool, size_>, size_>, populationSize_> population;
     for (auto& p : population)
@@ -345,6 +418,8 @@ void runner_4() {
 
             // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
             // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
+            // remember that fitness is simply shortest path from entrace to exit via checkpoints
+            // so, smaller is better
             i1 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[0]) - fitnesses.begin();
             i2 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[1]) - fitnesses.begin();
             // i1 and i2 cannot be the same
