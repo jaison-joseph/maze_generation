@@ -256,7 +256,7 @@ int pathFinder(
  * like (chkpt 1) <---DFS*--> (chkpt 2) and (chkpt 2) <---DFS*--> (chkpt 1), 
  * we cache such intermediate results to avoid redundant calculations
 */
-int fitness_3(array<array<bool, size_>, size_>& maze) {
+int fitness(array<array<bool, size_>, size_>& maze) {
     
     if (maze[entrance_[0]][entrance_[1]]) {
         return 0;
@@ -361,7 +361,7 @@ void saveGenerationStats(array<array<int, populationSize_>, generations_>& stats
  *          with the (modified) strongest two
  * 9. repeat steps 2-8, for mating events per generation * number of generations
 */
-void runner_4() {
+void runner() {
     array<array<array<bool, size_>, size_>, populationSize_> population;
     for (auto& p : population)
         p = genMaze();
@@ -398,7 +398,7 @@ void runner_4() {
 
             // auto start = chrono::steady_clock::now();
             for (int i = 0 ; i < 7 ; ++i) {
-                sortedFitnesses[i] = fitnesses[i] = fitness_3(population[indices[i]]);
+                sortedFitnesses[i] = fitnesses[i] = fitness(population[indices[i]]);
             }
             // auto end = chrono::steady_clock::now();
             // auto diff = end-start;
@@ -472,7 +472,7 @@ void runner_4() {
     }
     vector<array<array<bool, size_>, size_>> niceOnes;
     for (auto&p : population) {
-        auto result = fitness_3(p);
+        auto result = fitness(p);
         if (result > 0) {
             cout << "\n fitness: " << result;
             niceOnes.push_back(p);
@@ -488,7 +488,7 @@ int main() {
     init();
     // testPathFinder();
     // auto start = chrono::steady_clock::now();
-    runner_4();
+    runner();
     // auto end = chrono::steady_clock::now();
     // auto diff = end - start;
     // cout << "\n time: " << chrono::duration<double, milli>(diff).count() << " ms";
