@@ -32,3 +32,26 @@ try:
 # for debugging:
     -fno-omit-frame-pointer /
     -g // debug symbols
+
+# go from nested vector of bools to single vector of ints:
+we have:
+
+bool[30][30]: 
+
+
+we want it to be:
+    1 row is 30 bits -> less than size of int
+    so the bool[30][30] -> int[30]
+
+    what would the transformation look like?
+        (access)     bool[i][j] -> int[i] & 1 << (31-j)
+        (set to 1)   bool[i][j] -> int[i] = int[i]  |  (1 << (31-j))
+        (set to 0)   bool[i][j] -> int[i] = int[i]  & ~(1 << (31-j))
+        (flip 10 01) bool[i][j] -> int[i] = int[i]  ^  (1 << (31-j))
+
+using pprof:
+/opt/homebrew/bin/pprof [options] <program> <profiles>
+file:///private/tmp/pprof6563.3.svg
+
+env CPUPROFILE=run5.prof ./foobar
+pprof --text ./foobar run5.prof
