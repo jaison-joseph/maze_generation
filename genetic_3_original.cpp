@@ -613,6 +613,7 @@ void runner_4() {
     // fills allIndices with numbers starting from 0
     // https://stackoverflow.com/questions/4803898/fill-in-the-int-array-from-zero-to-defined-number
     iota(allIndices.begin(), allIndices.end(), 0);
+    // #pragma omp parallel num_threads(8)
     for (int g = 0 ; g < generations_ ; ++g) {
         for (int m = 0 ; m < matingEventsPerGeneration_ ; ++m) {
         //    cout << m;
@@ -633,6 +634,7 @@ void runner_4() {
             // find the fitness of the 7 population members
 
             // auto start = chrono::steady_clock::now();
+            // #pragma omp parallel for
             for (int i = 0 ; i < 7 ; ++i) {
                 sortedFitnesses[i] = fitnesses[i] = fitness_3(population[indices[i]]);
             }
