@@ -15,6 +15,7 @@
 #elif __linux__
 #include <atomic>
 #endif
+#include "gperftools/profiler.h"
 
 using namespace std;
 
@@ -149,7 +150,7 @@ static inline void uniformCrossover(array<array<bool, size_>, size_>& m1, array<
  * n2: change foo from an array of 2 into two ints, x & y
 */
 int pathFinder(
-    array<array<bool, size_>, size_>& maze,
+    const array<array<bool, size_>, size_>& maze,
     array<int, 2> start, 
     array<int, 2> end
 ) {
@@ -238,8 +239,8 @@ int pathFinder(
 // so apparently I overthought the fitness function
 // maze[i][j] is true => wall, false => empty
 // this version adds cache 
-int fitness_3(array<array<bool, size_>, size_>& maze) {
-    
+int fitness_3(const array<array<bool, size_>, size_>& maze) {
+    ProfilerStart("run4.prof");
     if (maze[entrance_[0]][entrance_[1]]) {
         return 0;
     }
@@ -295,6 +296,7 @@ int fitness_3(array<array<bool, size_>, size_>& maze) {
     // min element returns an iterator, so we derefence it
     bestResult = *min_element(checkpointDistances.begin(), checkpointDistances.end());
     return bestResult;
+    ProfilerStop();
 }
 
 
@@ -344,7 +346,7 @@ std::array<int, 7> threadInputs;
 std::atomic<int> readyCount (0);
 std::atomic<int> iterCount (-1);
 
-void work(int x, populationType& population, inputType& input, outputType& output1, outputType& output2) {
+void work(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     int localitercount = 0;
     while(true) {
 
@@ -370,7 +372,7 @@ void work(int x, populationType& population, inputType& input, outputType& outpu
     }
 }
 
-void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, populationType& population, inputType& input, outputType& output1, outputType& output2) {
+void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
         workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1), ref(output2));
     }
@@ -401,6 +403,7 @@ void thread_pool_terminate(std::array<std::thread, NUM_THREADS_>& workers) {
 // r0: original
 // r1: change the double loop to a single loop
 void runner_4() {
+    ProfilerStart("run4.prof");
     array<array<array<bool, size_>, size_>, populationSize_> population;
     for (auto& p : population)
         p = genMaze();
@@ -510,6 +513,7 @@ void runner_4() {
     cout << "pathfinder call count: " << debug_pathFinderCount << endl;
     #endif
     saveMazes_2(niceOnes, label);
+    ProfilerStop();
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);
 }

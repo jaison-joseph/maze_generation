@@ -24,3 +24,11 @@ but -O3 with mcpu does best overall {-O2 | -O3: -mcpu=apple-m2 | N/A }
 ~1:12:500 using pointers
 
 [1:04 - 1:16] after passing refs to input for threads instead of any copying hahahah
+
+try:
+    -march=native
+    -flto
+
+# for debugging:
+    -fno-omit-frame-pointer /
+    -g // debug symbols
