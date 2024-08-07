@@ -15,7 +15,6 @@
 #elif __linux__
 #include <atomic>
 #endif
-#include "gperftools/profiler.h"
 
 using namespace std;
 
@@ -37,13 +36,14 @@ const array<array<int, 2>, 4> checkpoints_ = {
 };
 array<array<int, size_>, size_> pathFinder_lk_;
 
+map<array<array<int, 2>, 2>, vector<int>> points2pathIdxs;
 
 random_device dev;
 mt19937 rng(dev());
-const uint_fast32_t rng_upper_bound_ = 1'000'000;
+const int rng_upper_bound_ = 1'000'000;
 uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // distribution in range [1, 10**6]
-const uint_fast32_t new_pm_ = rng_upper_bound_ * Pm_;
-const uint_fast32_t new_pc_ = rng_upper_bound_ * Pc_;
+const int new_pm_ = rng_upper_bound_ * Pm_;
+const int new_pc_ = rng_upper_bound_ * Pc_;
 
 #ifdef DEBUG_COUNT
 unsigned long int debug_pathFinderCount = 0;
@@ -53,6 +53,22 @@ void init() {
     for (int i = 0 ; i < size_ ; ++i) {
         pathFinder_lk_[i].fill(1'000'000);
     }
+
+    points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
+    points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
+    points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
+    points2pathIdxs[{{{ 0,  0}, {24,  6}}}] = {18, 19, 20, 21, 22, 23};
+    points2pathIdxs[{{{ 6, 24}, {12, 18}}}] = {0, 1, 6, 7, 12, 14, 16, 17, 18, 20, 22, 23};
+    points2pathIdxs[{{{ 6, 24}, {18, 12}}}] = {2, 3, 6, 8, 10, 11, 12, 13, 19, 20, 21, 22};
+    points2pathIdxs[{{{ 6, 24}, {24,  6}}}] = {4, 5, 7, 8, 9, 10, 13, 14, 15, 16, 18, 19};
+    points2pathIdxs[{{{ 6, 24}, {29, 29}}}] = {9, 11, 15, 17, 21, 23};
+    points2pathIdxs[{{{12, 18}, {18, 12}}}] = {0, 2, 4, 5, 8, 9, 14, 15, 18, 19, 21, 23};
+    points2pathIdxs[{{{12, 18}, {24,  6}}}] = {1, 2, 3, 4, 10, 11, 12, 13, 15, 17, 20, 21};
+    points2pathIdxs[{{{12, 18}, {29, 29}}}] = {3, 5, 13, 16, 19, 22};
+    points2pathIdxs[{{{18, 12}, {24,  6}}}] = {0, 1, 3, 5, 6, 7, 9, 11, 16, 17, 22, 23};
+    points2pathIdxs[{{{18, 12}, {29, 29}}}] = {1, 4, 7, 10, 18, 20};
+    points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
+
 }
 
 // overload of << for a maze
@@ -110,6 +126,7 @@ array<array<bool, size_>, size_> genMaze() {
     uniform_int_distribution<mt19937::result_type> getNum(1,1000); // distribution in range [1, 6]
     array<array<bool, size_>, size_> maze;
     for (auto&i : maze) {
+        #pragma clang loop vectorize(enable)
         for (auto&j : i) {
             j = (float(getNum(rng))/1000.0f <= fill_);
         }
@@ -118,25 +135,42 @@ array<array<bool, size_>, size_> genMaze() {
 }
 
 
-static inline void uniformMutation(array<array<bool, size_>, size_>& m) {
-    for (auto&i : m) {
-        for (auto& j : i) {
+void uniformMutation(array<array<bool, size_>, size_>& m) {
+    for (int i = 0 ; i < size_ ; i++) {
+        for (int j = 0 ; j < size_ ; j++) {
             if (getNum(rng) <= new_pm_) {
-                j = !j;
+                m[i][j] = !m[i][j];
             }
         }
     }
 }
 
-static inline void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
+void uniformMutation2(array<array<bool, size_>, size_>& m) {
+    static array<array<int, size_>, size_> rng_values;
+    for (auto& row : rng_values) {
+        for (auto& val : row) {
+            val = getNum(rng);
+        }
+    }
+    #pragma clang loop vectorize(enable)
+    for (int i = 0; i < size_; i++) {
+        for (int j = 0; j < size_; j++) {
+            if (rng_values[i][j] <= new_pm_) {
+                m[i][j] = !m[i][j];
+            }
+        }
+    }
+}
+
+void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
     
-    bool foo;
     for (int i = 0 ; i < size_ ; ++i) {
+        #pragma clang loop vectorize(enable)
         for (int j = 0 ; j < size_ ; ++j) {
             if (getNum(rng) <= new_pc_) {
-                foo = m1[i][j];
-                m1[i][j] = m2[i][j];
-                m2[i][j] = foo;   
+                bool foo = m1[i][j] ^ m2[i][j];
+                m1[i][j] ^= foo;
+                m2[i][j] ^= foo;   
             }
         }
     }
@@ -151,8 +185,8 @@ static inline void uniformCrossover(array<array<bool, size_>, size_>& m1, array<
 */
 int pathFinder(
     const array<array<bool, size_>, size_>& maze,
-    array<int, 2> start, 
-    array<int, 2> end
+    const array<int, 2>& start, 
+    const array<int, 2>& end
 ) {
     // fitness() already checks the same, this is (I think) redundant
     // if (maze[start[0]][start[1]]) {
@@ -163,6 +197,10 @@ int pathFinder(
     // }
 
     array<array<int, size_>, size_> lk = pathFinder_lk_;
+    // thread_local array<array<int, size_>, size_> lk;
+    for (int i = 0 ; i < size_ ; ++i) {
+        pathFinder_lk_[i].fill(1'000'000);
+    }
     lk[start[0]][start[1]] = 0;
 
     vector<int> q = {};
@@ -233,14 +271,15 @@ int pathFinder(
 
     // cout << "\n lk: \n" << lk;
 
-    return lk[end[0]][end[1]] == 1'000'000 ? 0 : lk[end[0]][end[1]];
+    // return lk[end[0]][end[1]] == 1'000'000 ? 0 : lk[end[0]][end[1]];
+    return lk[end[0]][end[1]];
 }
 
-// so apparently I overthought the fitness function
-// maze[i][j] is true => wall, false => empty
-// this version adds cache 
-int fitness_3(const array<array<bool, size_>, size_>& maze) {
-    ProfilerStart("run4.prof");
+__attribute__((always_inline)) int hashh(const int& i, const int& j, const int& k, const int& l) {
+    return (i << 15) | (j << 10) | (k << 5) | l;
+}
+
+int fitness_3_og(const array<array<bool, size_>, size_>& maze) {
     if (maze[entrance_[0]][entrance_[1]]) {
         return 0;
     }
@@ -296,7 +335,118 @@ int fitness_3(const array<array<bool, size_>, size_>& maze) {
     // min element returns an iterator, so we derefence it
     bestResult = *min_element(checkpointDistances.begin(), checkpointDistances.end());
     return bestResult;
-    ProfilerStop();
+}
+
+// so apparently I overthought the fitness function
+// maze[i][j] is true => wall, false => empty
+// this version adds cache 
+
+int fitness_3(const array<array<bool, size_>, size_>& maze) {
+    if (maze[entrance_[0]][entrance_[1]]) {
+        return 0;
+    }
+    if (maze[exit_[0]][exit_[1]]) {
+        return 0;
+    }
+    for (auto& c : checkpoints_) {
+        if (maze[c[0]][c[1]]) {
+            return 0;
+        }
+    }
+
+    static const std::vector<std::vector<std::array<int, 2>>> all_paths = {
+        {{0, 0}, {6, 24}, {12, 18}, {18, 12}, {24, 6}, {29, 29}},
+        {{0, 0}, {6, 24}, {12, 18}, {24, 6}, {18, 12}, {29, 29}},
+        {{0, 0}, {6, 24}, {18, 12}, {12, 18}, {24, 6}, {29, 29}},
+        {{0, 0}, {6, 24}, {18, 12}, {24, 6}, {12, 18}, {29, 29}},
+        {{0, 0}, {6, 24}, {24, 6}, {12, 18}, {18, 12}, {29, 29}},
+        {{0, 0}, {6, 24}, {24, 6}, {18, 12}, {12, 18}, {29, 29}},
+        {{0, 0}, {12, 18}, {6, 24}, {18, 12}, {24, 6}, {29, 29}},
+        {{0, 0}, {12, 18}, {6, 24}, {24, 6}, {18, 12}, {29, 29}},
+        {{0, 0}, {12, 18}, {18, 12}, {6, 24}, {24, 6}, {29, 29}},
+        {{0, 0}, {12, 18}, {18, 12}, {24, 6}, {6, 24}, {29, 29}},
+        {{0, 0}, {12, 18}, {24, 6}, {6, 24}, {18, 12}, {29, 29}},
+        {{0, 0}, {12, 18}, {24, 6}, {18, 12}, {6, 24}, {29, 29}},
+        {{0, 0}, {18, 12}, {6, 24}, {12, 18}, {24, 6}, {29, 29}},
+        {{0, 0}, {18, 12}, {6, 24}, {24, 6}, {12, 18}, {29, 29}},
+        {{0, 0}, {18, 12}, {12, 18}, {6, 24}, {24, 6}, {29, 29}},
+        {{0, 0}, {18, 12}, {12, 18}, {24, 6}, {6, 24}, {29, 29}},
+        {{0, 0}, {18, 12}, {24, 6}, {6, 24}, {12, 18}, {29, 29}},
+        {{0, 0}, {18, 12}, {24, 6}, {12, 18}, {6, 24}, {29, 29}},
+        {{0, 0}, {24, 6}, {6, 24}, {12, 18}, {18, 12}, {29, 29}},
+        {{0, 0}, {24, 6}, {6, 24}, {18, 12}, {12, 18}, {29, 29}},
+        {{0, 0}, {24, 6}, {12, 18}, {6, 24}, {18, 12}, {29, 29}},
+        {{0, 0}, {24, 6}, {12, 18}, {18, 12}, {6, 24}, {29, 29}},
+        {{0, 0}, {24, 6}, {18, 12}, {6, 24}, {12, 18}, {29, 29}},
+        {{0, 0}, {24, 6}, {18, 12}, {12, 18}, {6, 24}, {29, 29}}
+    };
+    
+    int totalDist, dist, bestResult;
+    map<int, int> cache;
+    int key;
+    bestResult = 1'000'000;
+    for (const vector<array<int, 2>>& path : all_paths) {
+        totalDist = 0;
+        for (int i = 0 ; i < path.size() - 1 ; ++i) {
+            key = path[i][0] << 15 | path[i][1] << 10 | path[i+1][0] << 5 | path[i+1][1];
+            if (cache.find(key) != cache.end()) {
+                dist = cache[key];
+            } 
+            else {
+                #ifdef DEBUG_COUNT
+                debug_pathFinderCount += 1;
+                #endif
+                dist = pathFinder(maze, path[i], path[i+1]);
+                cache[key] = dist; 
+                cache[path[i+1][0] << 15 | path[i+1][1] << 10 | path[i][0] << 5 | path[i][1]] = dist; 
+            }
+            if (dist == 1'000'000) {
+                totalDist = 1'000'000'000;
+                break;
+            }
+            totalDist += dist;
+        }
+        if (totalDist < bestResult) {
+            bestResult = totalDist;
+        }
+    }
+    if (bestResult >= 1'000'000)
+        return 0;
+    return bestResult;
+}
+
+
+int fitness_4(const array<array<bool, size_>, size_>& maze) {
+    
+    if (maze[entrance_[0]][entrance_[1]] || maze[exit_[0]][exit_[1]]) {
+        return 0;
+    }
+    for (auto& c : checkpoints_) {
+        if (maze[c[0]][c[1]]) {
+            return 0;
+        }
+    }
+
+    int totalDist, dist, bestResult;
+    int key;
+    bestResult = 1'000'000;
+
+    array<int, 24> pathDist;
+    pathDist.fill(0);
+
+    // precompute pair-wise distances
+    for (const auto& [key, value] : points2pathIdxs) {
+        dist = pathFinder(maze, key[0], key[1]);
+        // fill in paths
+        #pragma clang loop vectorize(assume_safety)
+        for (const int& idx : value) {
+            pathDist[idx] += dist;
+        }
+    }
+    bestResult = *min_element(pathDist.begin(), pathDist.end());
+    if (bestResult >= 1'000'000)
+        return 0;
+    return bestResult;
 }
 
 
@@ -362,13 +512,51 @@ void work(int x, const populationType& population, const inputType& input, outpu
 
         // work
         // std::cout << x << std::endl;
-        output1[x] = output2[x] = fitness_3(population[input[x]]);
+        // output1[x] = output2[x] = fitness_3_og(population[input[x]]);
+        output1[x] = output2[x] = fitness_4(population[input[x]]);
 
         // std::this_thread::sleep_for(100ms);
         // std::this_thread::sleep_for (std::chrono::seconds(x));
 
         // end of loop
         readyCount -= 1;
+    }
+}
+
+void work2(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
+    int localitercount = 0;
+    std::vector<double> timings;
+    int result;
+
+    while(true) {
+        while (localitercount != iterCount) {}
+
+        if (termination_flag_) break;
+
+        localitercount += 1;
+
+        // Start timing
+        auto start = std::chrono::high_resolution_clock::now();
+
+        // The line we want to time
+        result = fitness_4(population[input[x]]);
+
+        // End timing
+        auto end = std::chrono::high_resolution_clock::now();
+
+        output1[x] = output2[x] = result;
+
+        // Calculate duration in microseconds
+        std::chrono::duration<double, std::micro> duration = end - start;
+        timings.push_back(duration.count());
+
+        readyCount -= 1;
+    }
+
+    // Calculate and print average time
+    if (!timings.empty()) {
+        double average = std::accumulate(timings.begin(), timings.end(), 0.0) / timings.size();
+        std::cout << "Average time for the timed statement: " << average << " microseconds" << std::endl;
     }
 }
 
@@ -403,7 +591,6 @@ void thread_pool_terminate(std::array<std::thread, NUM_THREADS_>& workers) {
 // r0: original
 // r1: change the double loop to a single loop
 void runner_4() {
-    ProfilerStart("run4.prof");
     array<array<array<bool, size_>, size_>, populationSize_> population;
     for (auto& p : population)
         p = genMaze();
@@ -470,6 +657,9 @@ void runner_4() {
             uniformCrossover(m1, m2);
             uniformMutation(m1);
             uniformMutation(m2);
+            // uniformMutation2(m1);
+            // uniformMutation2(m2);
+            
 
             // cout << "\n m1 and m2 AFTER evolution: \n";
             // cout << m1 << "\n\n" << m2;
@@ -501,19 +691,18 @@ void runner_4() {
     //    cout << label;
     }
     thread_pool_terminate(workers);
-    vector<array<array<bool, size_>, size_>> niceOnes;
-    for (auto&p : population) {
-        auto result = fitness_3(p);
-        if (result > 0) {
-            // cout << "\n fitness: " << result;
-            niceOnes.push_back(p);
-        }
-    }
+    // vector<array<array<bool, size_>, size_>> niceOnes;
+    // for (auto&p : population) {
+    //     auto result = fitness_3(p);
+    //     if (result > 0) {
+    //         // cout << "\n fitness: " << result;
+    //         niceOnes.push_back(p);
+    //     }
+    // }
     #ifdef DEBUG_COUNT
     cout << "pathfinder call count: " << debug_pathFinderCount << endl;
     #endif
-    saveMazes_2(niceOnes, label);
-    ProfilerStop();
+    // saveMazes_2(niceOnes, label);
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);
 }
