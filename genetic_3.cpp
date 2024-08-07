@@ -487,7 +487,6 @@ void saveGenerationStats(array<array<int, populationSize_>, generations_>& stats
 #define USE_REFERENCES 1;
 
 const int NUM_THREADS_ = 7;
-bool termination_flag_ = false;
 typedef array<array<array<bool, size_>, size_>, populationSize_> populationType;
 typedef array<int, 7> inputType;
 typedef array<int, 7> outputType;
@@ -495,6 +494,82 @@ std::array<int, 7> threadInputs;
 
 std::atomic<int> readyCount (0);
 std::atomic<int> iterCount (-1);
+
+/**** VERSION 2 */
+std::mutex m;
+std::mutex m_end;
+std::condition_variable cond;
+std::condition_variable cond_cc;
+std::atomic<int> num_threads;
+std::atomic<int> waiting_for_increment;
+std::atomic<int> global_cc;
+std::mutex barrier_mutex;
+std::atomic<bool> barrier_completed{false};
+std::atomic<bool> termination_flag_{false};
+std::condition_variable barrier_cv;
+
+void barrier_init(int n) {
+    num_threads.store(n);
+    waiting_for_increment.store(0);
+    barrier_completed.store(false);
+    global_cc.store(-1);
+}
+
+void barrier_wait(int cc) {
+    std::unique_lock<std::mutex> lock(m);
+    cond_cc.wait(lock, [cc]{
+        return global_cc.load() == cc;
+    });
+    
+    waiting_for_increment++;
+    
+    if (waiting_for_increment.load() == num_threads) {
+        cond.notify_all();
+    } else {
+        cond_cc.notify_all();
+        cond.wait(lock);
+    }
+}
+
+void barrier_wait(int cc, long tid) {
+    std::unique_lock<std::mutex> lock(m);
+    cond_cc.wait(lock, [cc, tid]{
+        std::cout << "thread " << tid << " (" << cc << ") waiting cc check (" << global_cc.load() << ") \n";
+        return global_cc.load() == cc;
+    });
+    
+    std::cout << "thread " << tid << " (" << cc << ") free \n";
+    
+    waiting_for_increment++;
+    
+    if (waiting_for_increment.load() == num_threads) {
+        std::cout << "thread " << tid << " (" << cc << ") signaling condition...\n";
+        cond.notify_all();
+    } else {
+        std::cout << "thread " << tid << " (" << cc << ") waiting for others \n";
+        cond_cc.notify_all();
+        cond.wait(lock);
+    }
+}
+
+void barrier_done(int cc, long tid) {
+    std::unique_lock<std::mutex> lock(m);
+    waiting_for_increment--;
+    if (waiting_for_increment.load() == 0) {
+        // cout << "thread " << tid << " sets barrier_completed to true \n";
+        barrier_completed.store(true);
+        barrier_cv.notify_one();
+    }
+}
+
+void barrier_exit() {
+    std::unique_lock<std::mutex> lock(m);
+    num_threads.store(num_threads.load() - 1);
+    cond_cc.notify_all(); // for the ahead-of-time n+1 cc threads
+    if (waiting_for_increment.load() == num_threads.load()) {
+        cond.notify_all();
+    }
+}
 
 void work(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     int localitercount = 0;
@@ -521,6 +596,40 @@ void work(int x, const populationType& population, const inputType& input, outpu
         // end of loop
         readyCount -= 1;
     }
+    barrier_exit();
+}
+
+void work_3(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
+    int localitercount = 0;
+    while(true) {
+
+        // wait until signaled
+        // readyCount == 0 ensures that the work won't happen until there's an input from master thread
+
+        //:) std::cout << x << " waiting " << std::endl;
+
+        barrier_wait(localitercount);
+
+        // check if termination flag is set. If yes, return True
+        if (termination_flag_.load()) break;
+
+        localitercount += 1;
+
+        // work
+        //:) std::cout << x << " got work " << std::endl;
+        // output1[x] = output2[x] = fitness_3_og(population[input[x]]);
+        output1[x] = output2[x] = fitness_4(population[input[x]]);
+
+
+        // std::this_thread::sleep_for(100ms);
+        // std::this_thread::sleep_for (std::chrono::seconds(x));
+
+        // end of loop
+        // readyCount--;
+
+        barrier_done(localitercount, x);
+    }
+    barrier_exit();
 }
 
 void work2(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
@@ -562,7 +671,7 @@ void work2(int x, const populationType& population, const inputType& input, outp
 
 void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
-        workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1), ref(output2));
+        workers[i] = std::thread(work_3, i, ref(population), ref(input), ref(output1), ref(output2));
     }
     // cout << " initialization done";
 }
@@ -682,7 +791,7 @@ void runner_4() {
             population[indices[i4]] = m2;
 
         // }
-        // cout << "\n sortedFitnesses: " << sortedFitnesses;
+        cout << "\n sortedFitnesses: " << sortedFitnesses;
     //    label = "\n";
     //    label += "-----------------------------";
     //    label += (" end of generation " + to_string(g+1) + ' ');
@@ -707,9 +816,153 @@ void runner_4() {
     // saveMatingEventStats(matingEventStats);
 }
 
+void runner_5() {
+    array<array<array<bool, size_>, size_>, populationSize_> population;
+    for (auto& p : population)
+        p = genMaze();
+    array<int, 7> fitnesses;
+    array<int, 7> sortedFitnesses;
+    array<int, 7> indices;
+    array<array<bool, size_>, size_> m1;
+    array<array<bool, size_>, size_> m2;
+    // indices of the two fittest members, then the two weakest members
+    int i1, i2, i3, i4;
+    string label;
+
+
+    std::array<std::thread, NUM_THREADS_> workers;
+    barrier_init(NUM_THREADS_);
+    thread_pool_init(workers, ref(population), ref(indices), ref(fitnesses), ref(sortedFitnesses));
+    
+    auto randomDevice = mt19937{random_device{}()};
+    const int numIterations_ = generations_ * matingEventsPerGeneration_;
+    random_device sample_dev;
+    mt19937 sample_rng(sample_dev());
+    uniform_int_distribution<mt19937::result_type> sample_getNum(0,populationSize_-1); // distribution in range [1, 10**6]
+    
+    for (int g = 0 ; g < numIterations_ ; ++g) {
+
+            barrier_completed.store(false);
+
+            for (int i = 0 ; i < 7 ; i++) {
+                indices[i] = sample_getNum(sample_rng);
+            }
+
+            // global_cc.store(global_cc.load() + 1);
+            global_cc++;
+            cond_cc.notify_all();
+            // if (waiting_for_increment.load() == num_threads.load()) {
+                //:) cout << "notify cond from main \n";
+                // cond.notify_all();
+            // }
+            // else {
+                //:) cout << "waiting_for_increment: " << waiting_for_increment.load() << " | num_threads: " << num_threads.load() << '\n';
+            // }
+            {
+                //:) cout << "waiting in main 1\n";
+                std::unique_lock<std::mutex> lock(m);
+                //:) cout << "waiting in main 2\n";
+                barrier_cv.wait(lock, []{ return barrier_completed.load(); });
+            }
+            // while (!barrier_completed.load()) {
+            //    std::this_thread::sleep_for(std::chrono::seconds(1)); 
+            // }
+            // std::this_thread::sleep_for(std::chrono::seconds(1));
+
+            // since we passed a ref of outputs to each thread, no copying from threadOutput -> wherever it was supposed to be
+
+            // auto end = chrono::steady_clock::now();
+            // auto diff = end-start;
+            // cout<<"\n time: "<< chrono::duration<double, milli>(diff).count()<<" ms";
+            
+            // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
+            // find the fittest two members
+            // the fitnesses are sorted in descending order
+            sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
+
+            // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
+            // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
+            i1 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[0]) - fitnesses.begin();
+            i2 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[1]) - fitnesses.begin();
+            // i1 and i2 cannot be the same
+            while (i1 == i2 || fitnesses[i2] != sortedFitnesses[1]) {
+                i2 = (i2 + 1)%7;
+            }
+
+            // cout << "\n i1: " << i1 << " | i2: " << i2 ;
+
+            // m1 and m2 are copies of the two fittest mazes
+            m1 = population[indices[i1]];
+            m2 = population[indices[i2]];
+
+            // cout << "\n m1 and m2 BEFORE evolution: \n";
+            // cout << m1 << "\n\n" << m2;
+
+            // evolution ....
+            uniformCrossover(m1, m2);
+            uniformMutation(m1);
+            uniformMutation(m2);
+            // uniformMutation2(m1);
+            // uniformMutation2(m2);
+            
+
+            // cout << "\n m1 and m2 AFTER evolution: \n";
+            // cout << m1 << "\n\n" << m2;
+
+            // now i3 and i4 will contain indces of the weakest 2 elements
+            i3 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[6]) - fitnesses.begin();
+            i4 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[5]) - fitnesses.begin();
+            // i1, i2, i3 and i4 have to be different cannot be the same
+            while (i3 == i1 || i3 == i2 || fitnesses[i3] != sortedFitnesses[6]) {
+                i3 = (i3 + 1)%7;
+            }
+            while (i4 == i1 || i4 == i2 || i4 == i3 || fitnesses[i4] != sortedFitnesses[5]) {
+                i4 = (i4 + 1)%7;
+            }
+
+            // cout << "\n i3: " << i3 << " | i4: " << i4 ;
+
+            // overwrite the weakest two with the modified fittest two
+            population[indices[i3]] = m1;
+            population[indices[i4]] = m2;
+
+        // }
+        // cout << "\n sortedFitnesses: " << sortedFitnesses;
+    //    label = "\n";
+    //    label += "-----------------------------";
+    //    label += (" end of generation " + to_string(g+1) + ' ');
+    //    label += "-----------------------------";
+    //    label += '\n';
+    //    cout << label;
+    }
+    // cout << "END OF MASTER THREAD LOOP \n";
+    // thread_pool_terminate(workers);
+    termination_flag_.store(true);
+    global_cc++;
+    cond_cc.notify_all();
+
+    for (int i = 0 ; i < NUM_THREADS_ ; i++) {
+        workers[i].join();
+    }
+    vector<array<array<bool, size_>, size_>> niceOnes;
+    for (auto&p : population) {
+        auto result = fitness_3(p);
+        if (result > 0) {
+            // cout << "\n fitness: " << result;
+            niceOnes.push_back(p);
+        }
+    }
+    #ifdef DEBUG_COUNT
+    cout << "pathfinder call count: " << debug_pathFinderCount << endl;
+    #endif
+    saveMazes_2(niceOnes, label);
+    // saveGenerationStats(generationStats);
+    // saveMatingEventStats(matingEventStats);
+}
+
 // g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o a
 int main() {
     init();
-    runner_4();
+    runner_5();
     return 0;
 }
