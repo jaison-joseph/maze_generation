@@ -496,34 +496,34 @@ std::atomic<int> readyCount (0);
 std::atomic<int> iterCount (-1);
 
 /**** VERSION 2 */
-// TODO remove unnecessary atomics, make some atomics non-atomic (unnecessary ones)
-std::mutex m;
-std::condition_variable cond;
-std::condition_variable cond_cc;
-std::atomic<int> num_threads;
-std::atomic<int> waiting_for_increment;
-std::atomic<int> global_cc;
-std::mutex barrier_mutex;
-std::atomic<bool> barrier_completed{false};
-std::atomic<bool> termination_flag_{false};
-std::condition_variable barrier_cv;
+std::mutex m;                       // for the 2 cv's below
+std::condition_variable cond;       // for lock-step
+std::condition_variable cond_cc;    // to hold threads ahead of the rest
+int num_threads;                    // used by barrier logic, represents number of active thread workers, decremented on exit
+int waiting_for_increment;          // number of threads past cond_cc, waiting for cond
+int global_cc;                      // global counter for number of iterations, increment to run another round of worker thread work
+bool termination_flag_;             // set to true to get worker threads to complete execution
+std::mutex barrier_mutex;           // for the main thread to wait, until all threads have finished task
+bool barrier_completed;             // also for the main thread
+std::condition_variable barrier_cv; // also for the main thread
 
 void barrier_init(const int& n) {
-    num_threads.store(n);
-    waiting_for_increment.store(0);
-    barrier_completed.store(false);
-    global_cc.store(-1);
+    num_threads = n;
+    waiting_for_increment = 0;
+    termination_flag_ = false;
+    barrier_completed = false;
+    global_cc = -1;
 }
 
 void barrier_wait(const int& cc) {
     std::unique_lock<std::mutex> lock(m);
     cond_cc.wait(lock, [cc]{
-        return global_cc.load() == cc;
+        return global_cc == cc;
     });
     
     waiting_for_increment++;
     
-    if (waiting_for_increment.load() == num_threads) {
+    if (waiting_for_increment == num_threads) {
         cond.notify_all();
     } else {
         cond_cc.notify_all();
@@ -534,15 +534,15 @@ void barrier_wait(const int& cc) {
 void barrier_wait(const int& cc, const long& tid) {
     std::unique_lock<std::mutex> lock(m);
     cond_cc.wait(lock, [cc, tid]{
-        std::cout << "thread " << tid << " (" << cc << ") waiting cc check (" << global_cc.load() << ") \n";
-        return global_cc.load() == cc;
+        std::cout << "thread " << tid << " (" << cc << ") waiting cc check (" << global_cc << ") \n";
+        return global_cc == cc;
     });
     
     std::cout << "thread " << tid << " (" << cc << ") free \n";
     
     waiting_for_increment++;
     
-    if (waiting_for_increment.load() == num_threads) {
+    if (waiting_for_increment == num_threads) {
         std::cout << "thread " << tid << " (" << cc << ") signaling condition...\n";
         cond.notify_all();
     } else {
@@ -555,9 +555,9 @@ void barrier_wait(const int& cc, const long& tid) {
 void barrier_done(const int& cc, const long& tid) {
     std::unique_lock<std::mutex> lock(m);
     waiting_for_increment--;
-    if (waiting_for_increment.load() == 0) {
+    if (waiting_for_increment == 0) {
         cout << "thread " << tid << " sets barrier_completed to true \n";
-        barrier_completed.store(true);
+        barrier_completed = true;
         barrier_cv.notify_one();
     }
 }
@@ -565,17 +565,17 @@ void barrier_done(const int& cc, const long& tid) {
 void barrier_done(const int& cc) {
     std::unique_lock<std::mutex> lock(m);
     waiting_for_increment--;
-    if (waiting_for_increment.load() == 0) {
-        barrier_completed.store(true);
+    if (waiting_for_increment == 0) {
+        barrier_completed = true;
         barrier_cv.notify_one();
     }
 }
 
 void barrier_exit() {
     std::unique_lock<std::mutex> lock(m);
-    num_threads.store(num_threads.load() - 1);
+    num_threads--;
     cond_cc.notify_all(); // for the ahead-of-time n+1 cc threads
-    if (waiting_for_increment.load() == num_threads.load()) {
+    if (waiting_for_increment == num_threads) {
         cond.notify_all();
     }
 }
@@ -620,7 +620,7 @@ void work_3(int x, const populationType& population, const inputType& input, out
         barrier_wait(localitercount);
 
         // check if termination flag is set. If yes, return True
-        if (termination_flag_.load()) break;
+        if (termination_flag_) break;
 
         localitercount += 1;
 
@@ -649,12 +649,12 @@ void work_4(int x, const populationType& population, const inputType& input, out
         // Inlined barrier_wait
         lock.lock();
         cond_cc.wait(lock, [&localitercount]{
-            return global_cc.load() == localitercount;
+            return global_cc == localitercount;
         });
         
         waiting_for_increment++;
         
-        if (waiting_for_increment.load() == num_threads) {
+        if (waiting_for_increment == num_threads) {
             cond.notify_all();
         } else {
             cond_cc.notify_all();
@@ -663,7 +663,7 @@ void work_4(int x, const populationType& population, const inputType& input, out
         lock.unlock();
 
         // check if termination flag is set. If yes, break the loop
-        if (termination_flag_.load()) break;
+        if (termination_flag_) break;
 
         localitercount += 1;
 
@@ -673,8 +673,8 @@ void work_4(int x, const populationType& population, const inputType& input, out
         // Inlined barrier_done
         lock.lock();
         waiting_for_increment--;
-        if (waiting_for_increment.load() == 0) {
-            barrier_completed.store(true);
+        if (waiting_for_increment == 0) {
+            barrier_completed = true;
             barrier_cv.notify_one();
         }
         lock.unlock();
@@ -682,9 +682,9 @@ void work_4(int x, const populationType& population, const inputType& input, out
 
     // Inlined barrier_exit
     lock.lock();
-    num_threads.store(num_threads.load() - 1);
+    num_threads--;
     cond_cc.notify_all(); // for the ahead-of-time n+1 cc threads
-    if (waiting_for_increment.load() == num_threads.load()) {
+    if (waiting_for_increment == num_threads) {
         cond.notify_all();
     }
     lock.unlock();
@@ -771,7 +771,7 @@ void runner_5() {
     
     for (int g = 0 ; g < numIterations_ ; ++g) {
 
-            barrier_completed.store(false);
+            barrier_completed = false;
 
             for (int i = 0 ; i < 7 ; i++) {
                 indices[i] = sample_getNum(sample_rng);
@@ -781,7 +781,7 @@ void runner_5() {
             cond_cc.notify_all();
             {
                 std::unique_lock<std::mutex> lock(m);
-                barrier_cv.wait(lock, []{ return barrier_completed.load(); });
+                barrier_cv.wait(lock, []{ return barrier_completed; });
             }
 
             // since we passed a ref of outputs to each thread, no copying from threadOutput -> wherever it was supposed to be
@@ -852,7 +852,7 @@ void runner_5() {
     }
     
     // terminate workers, join threads
-    termination_flag_.store(true);
+    termination_flag_ = true;
     global_cc++;
     cond_cc.notify_all();
 
@@ -865,14 +865,14 @@ void runner_5() {
     #endif
 
     // save logic
-    // vector<array<array<bool, size_>, size_>> niceOnes;
-    // for (auto&p : population) {
-    //     auto result = fitness_3(p);
-    //     if (result > 0) {
-    //         // cout << "\n fitness: " << result;
-    //         niceOnes.push_back(p);
-    //     }
-    // }
+    vector<array<array<bool, size_>, size_>> niceOnes;
+    for (auto&p : population) {
+        auto result = fitness_3(p);
+        if (result > 0) {
+            // cout << "\n fitness: " << result;
+            niceOnes.push_back(p);
+        }
+    }
     // saveMazes_2(niceOnes, label);
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);
