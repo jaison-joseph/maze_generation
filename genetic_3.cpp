@@ -198,9 +198,9 @@ int pathFinder(
 
     array<array<int, size_>, size_> lk = pathFinder_lk_;
     // thread_local array<array<int, size_>, size_> lk;
-    for (int i = 0 ; i < size_ ; ++i) {
-        pathFinder_lk_[i].fill(1'000'000);
-    }
+    // for (int i = 0 ; i < size_ ; ++i) {
+    //     pathFinder_lk_[i].fill(1'000'000);
+    // }
     lk[start[0]][start[1]] = 0;
 
     vector<int> q = {};
@@ -496,6 +496,7 @@ std::atomic<int> readyCount (0);
 std::atomic<int> iterCount (-1);
 
 /**** VERSION 2 */
+// TODO remove unnecessary atomics, make some atomics non-atomic (unnecessary ones)
 std::mutex m;
 std::condition_variable cond;
 std::condition_variable cond_cc;
@@ -841,7 +842,7 @@ void runner_5() {
             population[indices[i4]] = m2;
 
         // }
-        cout << "\n sortedFitnesses: " << sortedFitnesses;
+        // cout << "\n sortedFitnesses: " << sortedFitnesses;
     //    label = "\n";
     //    label += "-----------------------------";
     //    label += (" end of generation " + to_string(g+1) + ' ');
