@@ -848,20 +848,10 @@ void runner_5() {
                 indices[i] = sample_getNum(sample_rng);
             }
 
-            // global_cc.store(global_cc.load() + 1);
             global_cc++;
             cond_cc.notify_all();
-            // if (waiting_for_increment.load() == num_threads.load()) {
-                //:) cout << "notify cond from main \n";
-                // cond.notify_all();
-            // }
-            // else {
-                //:) cout << "waiting_for_increment: " << waiting_for_increment.load() << " | num_threads: " << num_threads.load() << '\n';
-            // }
             {
-                //:) cout << "waiting in main 1\n";
                 std::unique_lock<std::mutex> lock(m);
-                //:) cout << "waiting in main 2\n";
                 barrier_cv.wait(lock, []{ return barrier_completed.load(); });
             }
             // while (!barrier_completed.load()) {
@@ -944,18 +934,18 @@ void runner_5() {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
         workers[i].join();
     }
-    vector<array<array<bool, size_>, size_>> niceOnes;
-    for (auto&p : population) {
-        auto result = fitness_3(p);
-        if (result > 0) {
-            // cout << "\n fitness: " << result;
-            niceOnes.push_back(p);
-        }
-    }
+    // vector<array<array<bool, size_>, size_>> niceOnes;
+    // for (auto&p : population) {
+    //     auto result = fitness_3(p);
+    //     if (result > 0) {
+    //         // cout << "\n fitness: " << result;
+    //         niceOnes.push_back(p);
+    //     }
+    // }
     #ifdef DEBUG_COUNT
     cout << "pathfinder call count: " << debug_pathFinderCount << endl;
     #endif
-    saveMazes_2(niceOnes, label);
+    // saveMazes_2(niceOnes, label);
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);
 }
