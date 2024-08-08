@@ -32,3 +32,9 @@ try:
 # for debugging:
     -fno-omit-frame-pointer /
     -g // debug symbols
+
+LD_PRELOAD=/opt/homebrew/Cellar/gperftools/2.15/lib/libprofiler.0.dylib CPUPROFILE=test.prof ./foobar
+
+file:///private/tmp/pprof75121.0.svg
+
+in the versions of runner with mutex/cv based thread communications, inlining the barrier method versus not doesn't seem to impact performance 
