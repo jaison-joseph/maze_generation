@@ -3,12 +3,11 @@
 
 CXX = g++
 DEBUG_FLAGS = -g -fno-omit-frame-pointer
-# COMMON_FLAGS = -std=c++17 -pthread -I/opt/homebrew/Cellar/gperftools/2.15/include -march=native -flto
-COMMON_FLAGS = -std=c++17 -pthread -march=native -flto
-CXXFLAGS = $(COMMON_FLAGS)
+COMMON_FLAGS = -std=c++17 -pthread -march=native -flto -Xclang -fopenmp -I/opt/homebrew/opt/libomp/include
+VECTORIZE_FLAGS = -fvectorize -fslp-vectorize -fveclib=libmvec
+CXXFLAGS = $(COMMON_FLAGS) $(VECTORIZE_FLAGS)
 CXXFLAGS += $(if $(DEBUG),-Og $(DEBUG_FLAGS),-O3)
-LDFLAGS = -Wl,-stack_size -Wl,0x1000000
-# LDFLAGS = -Wl,-stack_size -Wl,0x10000000 -DWITHGPERFTOOLS -L/opt/homebrew/Cellar/gperftools/2.15/lib -lprofiler
+LDFLAGS = -Wl,-stack_size -Wl,0x1000000 -L/opt/homebrew/opt/libomp/lib -lomp
 
 # The name of your executable
 EXECUTABLE = foobar

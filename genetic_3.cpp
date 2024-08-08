@@ -16,6 +16,8 @@
 #include <atomic>
 #endif
 
+#include <omp.h>
+
 using namespace std;
 
 const int size_= 30;
@@ -297,7 +299,7 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
             return 0;
         }
     }
-
+ 
     int totalDist, dist, bestResult;
     int key;
     bestResult = 1'000'000;
@@ -306,10 +308,10 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
     pathDist.fill(0);
 
     // precompute pair-wise distances
+    #pragma clang loop vectorize(enable)
     for (const auto& [key, value] : points2pathIdxs) {
         dist = pathFinder(maze, key[0], key[1]);
         // fill in paths
-        #pragma clang loop vectorize(assume_safety)
         for (const int& idx : value) {
             pathDist[idx] += dist;
         }
@@ -574,6 +576,19 @@ void runner() {
             uniformCrossover2(m1, m2);
             uniformMutation2(m1);
             uniformMutation2(m2);
+
+            //not as performant as you'd think, the workload is too little
+            // #pragma omp parallel sections
+            // {
+            //     #pragma omp section
+            //     {
+            //         uniformMutation2(m1);
+            //     }
+            //     #pragma omp section
+            //     {
+            //         uniformMutation2(m2);
+            //     }
+            // }
             
 
             // cout << "\n m1 and m2 AFTER evolution: \n";
