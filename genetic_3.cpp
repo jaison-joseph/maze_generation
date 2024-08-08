@@ -45,6 +45,10 @@ uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // di
 const int new_pm_ = rng_upper_bound_ * Pm_;
 const int new_pc_ = rng_upper_bound_ * Pc_;
 
+std::vector<std::mt19937> rngs;
+std::random_device rd;
+
+
 #ifdef DEBUG_COUNT
 unsigned long int debug_pathFinderCount = 0;
 #endif
@@ -68,6 +72,11 @@ void init() {
     points2pathIdxs[{{{18, 12}, {24,  6}}}] = {0, 1, 3, 5, 6, 7, 9, 11, 16, 17, 22, 23};
     points2pathIdxs[{{{18, 12}, {29, 29}}}] = {1, 4, 7, 10, 18, 20};
     points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
+
+    // Fill the vector with 10 RNGs, for example
+for (int i = 0; i < size_; ++i) {
+    rngs.emplace_back(random_device{}());
+}
 
 }
 
@@ -126,14 +135,12 @@ array<array<bool, size_>, size_> genMaze() {
     uniform_int_distribution<mt19937::result_type> getNum(1,1000); // distribution in range [1, 6]
     array<array<bool, size_>, size_> maze;
     for (auto&i : maze) {
-        #pragma clang loop vectorize(enable)
         for (auto&j : i) {
             j = (float(getNum(rng))/1000.0f <= fill_);
         }
     }
     return maze;
 }
-
 
 void uniformMutation(array<array<bool, size_>, size_>& m) {
     for (int i = 0 ; i < size_ ; i++) {
@@ -146,16 +153,10 @@ void uniformMutation(array<array<bool, size_>, size_>& m) {
 }
 
 void uniformMutation2(array<array<bool, size_>, size_>& m) {
-    static array<array<int, size_>, size_> rng_values;
-    for (auto& row : rng_values) {
-        for (auto& val : row) {
-            val = getNum(rng);
-        }
-    }
     #pragma clang loop vectorize(enable)
-    for (int i = 0; i < size_; i++) {
-        for (int j = 0; j < size_; j++) {
-            if (rng_values[i][j] <= new_pm_) {
+    for (int i = 0 ; i < size_ ; i++) {
+        for (int j = 0 ; j < size_ ; j++) {
+            if (getNum(rngs[j]) <= new_pm_) {
                 m[i][j] = !m[i][j];
             }
         }
@@ -163,11 +164,22 @@ void uniformMutation2(array<array<bool, size_>, size_>& m) {
 }
 
 void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
-    
     for (int i = 0 ; i < size_ ; ++i) {
-        #pragma clang loop vectorize(enable)
         for (int j = 0 ; j < size_ ; ++j) {
             if (getNum(rng) <= new_pc_) {
+                bool foo = m1[i][j] ^ m2[i][j];
+                m1[i][j] ^= foo;
+                m2[i][j] ^= foo;   
+            }
+        }
+    }
+}
+
+void uniformCrossover2(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
+    #pragma clang loop vectorize(enable)
+    for (int i = 0 ; i < size_ ; ++i) {
+        for (int j = 0 ; j < size_ ; ++j) {
+            if (getNum(rngs[j]) <= new_pc_) {
                 bool foo = m1[i][j] ^ m2[i][j];
                 m1[i][j] ^= foo;
                 m2[i][j] ^= foo;   
@@ -559,11 +571,9 @@ void runner() {
             // cout << m1 << "\n\n" << m2;
 
             // evolution ....
-            uniformCrossover(m1, m2);
-            uniformMutation(m1);
-            uniformMutation(m2);
-            // uniformMutation2(m1);
-            // uniformMutation2(m2);
+            uniformCrossover2(m1, m2);
+            uniformMutation2(m1);
+            uniformMutation2(m2);
             
 
             // cout << "\n m1 and m2 AFTER evolution: \n";
