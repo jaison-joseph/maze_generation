@@ -275,147 +275,6 @@ int pathFinder(
     return lk[end[0]][end[1]];
 }
 
-__attribute__((always_inline)) int hashh(const int& i, const int& j, const int& k, const int& l) {
-    return (i << 15) | (j << 10) | (k << 5) | l;
-}
-
-int fitness_3_og(const array<array<bool, size_>, size_>& maze) {
-    if (maze[entrance_[0]][entrance_[1]]) {
-        return 0;
-    }
-    if (maze[exit_[0]][exit_[1]]) {
-        return 0;
-    }
-    for (auto& c : checkpoints_) {
-        if (maze[c[0]][c[1]]) {
-            return 0;
-        }
-    }
-    
-    vector<int> checkpointDistances;
-    checkpointDistances.clear();
-    vector<array<int, 2>> path;
-    // a copy for the permutations
-    array<array<int, 2>, 4> c = checkpoints_; 
-    int totalDist, dist, bestResult;
-    bool pathFailed;
-    map<array<array<int, 2>, 2>, int> cache;
-    do {
-        path.clear();
-        path.push_back(entrance_);
-        path.insert(path.end(), c.begin(), c.end());
-        path.push_back(exit_);
-        totalDist = 0;
-        pathFailed = false;
-        for (int i = 0 ; i < path.size() - 1 ; ++i) {
-            if (cache.find({path[i], path[i+1]}) != cache.end())
-                dist = cache[{path[i], path[i+1]}];
-            else if (cache.find({path[i+1], path[i]}) != cache.end())
-                dist = cache[{path[i+1], path[i]}];
-            else {
-                #ifdef DEBUG_COUNT
-                debug_pathFinderCount += 1;
-                #endif
-                dist = pathFinder(maze, path[i], path[i+1]);
-                cache[{path[i], path[i+1]}] = dist; 
-                // alsocache[path[i][0]][path[i][1]][path[i+1][0]][path[i+1][1]] = dist;
-            }
-            if (dist == 0) {
-                pathFailed = true;
-                break;
-            }
-            totalDist += dist;
-        }
-        if (!pathFailed) {
-            checkpointDistances.push_back(totalDist);
-        }
-    } while (next_permutation(c.begin(), c.end()));
-    if (checkpointDistances.size() == 0)
-        return 0;
-    // min element returns an iterator, so we derefence it
-    bestResult = *min_element(checkpointDistances.begin(), checkpointDistances.end());
-    return bestResult;
-}
-
-// so apparently I overthought the fitness function
-// maze[i][j] is true => wall, false => empty
-// this version adds cache 
-
-int fitness_3(const array<array<bool, size_>, size_>& maze) {
-    if (maze[entrance_[0]][entrance_[1]]) {
-        return 0;
-    }
-    if (maze[exit_[0]][exit_[1]]) {
-        return 0;
-    }
-    for (auto& c : checkpoints_) {
-        if (maze[c[0]][c[1]]) {
-            return 0;
-        }
-    }
-
-    static const std::vector<std::vector<std::array<int, 2>>> all_paths = {
-        {{0, 0}, {6, 24}, {12, 18}, {18, 12}, {24, 6}, {29, 29}},
-        {{0, 0}, {6, 24}, {12, 18}, {24, 6}, {18, 12}, {29, 29}},
-        {{0, 0}, {6, 24}, {18, 12}, {12, 18}, {24, 6}, {29, 29}},
-        {{0, 0}, {6, 24}, {18, 12}, {24, 6}, {12, 18}, {29, 29}},
-        {{0, 0}, {6, 24}, {24, 6}, {12, 18}, {18, 12}, {29, 29}},
-        {{0, 0}, {6, 24}, {24, 6}, {18, 12}, {12, 18}, {29, 29}},
-        {{0, 0}, {12, 18}, {6, 24}, {18, 12}, {24, 6}, {29, 29}},
-        {{0, 0}, {12, 18}, {6, 24}, {24, 6}, {18, 12}, {29, 29}},
-        {{0, 0}, {12, 18}, {18, 12}, {6, 24}, {24, 6}, {29, 29}},
-        {{0, 0}, {12, 18}, {18, 12}, {24, 6}, {6, 24}, {29, 29}},
-        {{0, 0}, {12, 18}, {24, 6}, {6, 24}, {18, 12}, {29, 29}},
-        {{0, 0}, {12, 18}, {24, 6}, {18, 12}, {6, 24}, {29, 29}},
-        {{0, 0}, {18, 12}, {6, 24}, {12, 18}, {24, 6}, {29, 29}},
-        {{0, 0}, {18, 12}, {6, 24}, {24, 6}, {12, 18}, {29, 29}},
-        {{0, 0}, {18, 12}, {12, 18}, {6, 24}, {24, 6}, {29, 29}},
-        {{0, 0}, {18, 12}, {12, 18}, {24, 6}, {6, 24}, {29, 29}},
-        {{0, 0}, {18, 12}, {24, 6}, {6, 24}, {12, 18}, {29, 29}},
-        {{0, 0}, {18, 12}, {24, 6}, {12, 18}, {6, 24}, {29, 29}},
-        {{0, 0}, {24, 6}, {6, 24}, {12, 18}, {18, 12}, {29, 29}},
-        {{0, 0}, {24, 6}, {6, 24}, {18, 12}, {12, 18}, {29, 29}},
-        {{0, 0}, {24, 6}, {12, 18}, {6, 24}, {18, 12}, {29, 29}},
-        {{0, 0}, {24, 6}, {12, 18}, {18, 12}, {6, 24}, {29, 29}},
-        {{0, 0}, {24, 6}, {18, 12}, {6, 24}, {12, 18}, {29, 29}},
-        {{0, 0}, {24, 6}, {18, 12}, {12, 18}, {6, 24}, {29, 29}}
-    };
-    
-    int totalDist, dist, bestResult;
-    map<int, int> cache;
-    int key;
-    bestResult = 1'000'000;
-    for (const vector<array<int, 2>>& path : all_paths) {
-        totalDist = 0;
-        for (int i = 0 ; i < path.size() - 1 ; ++i) {
-            key = path[i][0] << 15 | path[i][1] << 10 | path[i+1][0] << 5 | path[i+1][1];
-            if (cache.find(key) != cache.end()) {
-                dist = cache[key];
-            } 
-            else {
-                #ifdef DEBUG_COUNT
-                debug_pathFinderCount += 1;
-                #endif
-                dist = pathFinder(maze, path[i], path[i+1]);
-                cache[key] = dist; 
-                cache[path[i+1][0] << 15 | path[i+1][1] << 10 | path[i][0] << 5 | path[i][1]] = dist; 
-            }
-            if (dist == 1'000'000) {
-                totalDist = 1'000'000'000;
-                break;
-            }
-            totalDist += dist;
-        }
-        if (totalDist < bestResult) {
-            bestResult = totalDist;
-        }
-    }
-    if (bestResult >= 1'000'000)
-        return 0;
-    return bestResult;
-}
-
-
 int fitness_4(const array<array<bool, size_>, size_>& maze) {
     
     if (maze[entrance_[0]][entrance_[1]] || maze[exit_[0]][exit_[1]]) {
@@ -492,9 +351,6 @@ typedef array<int, 7> inputType;
 typedef array<int, 7> outputType;
 std::array<int, 7> threadInputs;
 
-std::atomic<int> readyCount (0);
-std::atomic<int> iterCount (-1);
-
 /**** VERSION 2 */
 std::mutex m;                       // for the 2 cv's below
 std::condition_variable cond;       // for lock-step
@@ -515,133 +371,7 @@ void barrier_init(const int& n) {
     global_cc = -1;
 }
 
-void barrier_wait(const int& cc) {
-    std::unique_lock<std::mutex> lock(m);
-    cond_cc.wait(lock, [cc]{
-        return global_cc == cc;
-    });
-    
-    waiting_for_increment++;
-    
-    if (waiting_for_increment == num_threads) {
-        cond.notify_all();
-    } else {
-        cond_cc.notify_all();
-        cond.wait(lock);
-    }
-}
-
-void barrier_wait(const int& cc, const long& tid) {
-    std::unique_lock<std::mutex> lock(m);
-    cond_cc.wait(lock, [cc, tid]{
-        std::cout << "thread " << tid << " (" << cc << ") waiting cc check (" << global_cc << ") \n";
-        return global_cc == cc;
-    });
-    
-    std::cout << "thread " << tid << " (" << cc << ") free \n";
-    
-    waiting_for_increment++;
-    
-    if (waiting_for_increment == num_threads) {
-        std::cout << "thread " << tid << " (" << cc << ") signaling condition...\n";
-        cond.notify_all();
-    } else {
-        std::cout << "thread " << tid << " (" << cc << ") waiting for others \n";
-        cond_cc.notify_all();
-        cond.wait(lock);
-    }
-}
-
-void barrier_done(const int& cc, const long& tid) {
-    std::unique_lock<std::mutex> lock(m);
-    waiting_for_increment--;
-    if (waiting_for_increment == 0) {
-        cout << "thread " << tid << " sets barrier_completed to true \n";
-        barrier_completed = true;
-        barrier_cv.notify_one();
-    }
-}
-
-void barrier_done(const int& cc) {
-    std::unique_lock<std::mutex> lock(m);
-    waiting_for_increment--;
-    if (waiting_for_increment == 0) {
-        barrier_completed = true;
-        barrier_cv.notify_one();
-    }
-}
-
-void barrier_exit() {
-    std::unique_lock<std::mutex> lock(m);
-    num_threads--;
-    cond_cc.notify_all(); // for the ahead-of-time n+1 cc threads
-    if (waiting_for_increment == num_threads) {
-        cond.notify_all();
-    }
-}
-
 void work(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
-    int localitercount = 0;
-    while(true) {
-
-        // wait until signaled
-        // readyCount == 0 ensures that the work won't happen until there's an input from master thread
-
-        while (localitercount != iterCount) {}
-
-        // check if termination flag is set. If yes, return True
-        if (termination_flag_) break;
-
-        localitercount += 1;
-
-        // work
-        // std::cout << x << std::endl;
-        // output1[x] = output2[x] = fitness_3_og(population[input[x]]);
-        output1[x] = output2[x] = fitness_4(population[input[x]]);
-
-        // std::this_thread::sleep_for(100ms);
-        // std::this_thread::sleep_for (std::chrono::seconds(x));
-
-        // end of loop
-        readyCount -= 1;
-    }
-    barrier_exit();
-}
-
-void work_3(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
-    int localitercount = 0;
-    while(true) {
-
-        // wait until signaled
-        // readyCount == 0 ensures that the work won't happen until there's an input from master thread
-
-        //:) std::cout << x << " waiting " << std::endl;
-
-        barrier_wait(localitercount);
-
-        // check if termination flag is set. If yes, return True
-        if (termination_flag_) break;
-
-        localitercount += 1;
-
-        // work
-        //:) std::cout << x << " got work " << std::endl;
-        // output1[x] = output2[x] = fitness_3_og(population[input[x]]);
-        output1[x] = output2[x] = fitness_4(population[input[x]]);
-
-
-        // std::this_thread::sleep_for(100ms);
-        // std::this_thread::sleep_for (std::chrono::seconds(x));
-
-        // end of loop
-        // readyCount--;
-
-        barrier_done(localitercount);
-    }
-    barrier_exit();
-}
-
-void work_4(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     int localitercount = 0;
     std::unique_lock<std::mutex> lock(m, std::defer_lock); // Create the lock but don't lock immediately
 
@@ -690,62 +420,77 @@ void work_4(int x, const populationType& population, const inputType& input, out
     lock.unlock();
 }
 
-void work2(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
+void work_2(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     int localitercount = 0;
+    std::unique_lock<std::mutex> lock(m, std::defer_lock); // Create the lock but don't lock immediately
     std::vector<double> timings;
     int result;
-
     while(true) {
-        while (localitercount != iterCount) {}
+        // Inlined barrier_wait
+        lock.lock();
+        cond_cc.wait(lock, [&localitercount]{
+            return global_cc == localitercount;
+        });
+        
+        waiting_for_increment++;
+        
+        if (waiting_for_increment == num_threads) {
+            cond.notify_all();
+        } else {
+            cond_cc.notify_all();
+            cond.wait(lock);
+        }
+        lock.unlock();
 
+        // check if termination flag is set. If yes, break the loop
         if (termination_flag_) break;
 
         localitercount += 1;
 
-        // Start timing
         auto start = std::chrono::high_resolution_clock::now();
-
-        // The line we want to time
+        
+        // work
         result = fitness_4(population[input[x]]);
-
-        // End timing
+        
         auto end = std::chrono::high_resolution_clock::now();
 
-        output1[x] = output2[x] = result;
-
-        // Calculate duration in microseconds
         std::chrono::duration<double, std::micro> duration = end - start;
         timings.push_back(duration.count());
 
-        readyCount -= 1;
+        output1[x] = output2[x] = result;
+
+
+        // Inlined barrier_done
+        lock.lock();
+        waiting_for_increment--;
+        if (waiting_for_increment == 0) {
+            barrier_completed = true;
+            barrier_cv.notify_one();
+        }
+        lock.unlock();
     }
 
-    // Calculate and print average time
+    // Inlined barrier_exit
+    lock.lock();
     if (!timings.empty()) {
         double average = std::accumulate(timings.begin(), timings.end(), 0.0) / timings.size();
         std::cout << "Average time for the timed statement: " << average << " microseconds" << std::endl;
     }
+    num_threads--;
+    cond_cc.notify_all(); // for the ahead-of-time n+1 cc threads
+    if (waiting_for_increment == num_threads) {
+        cond.notify_all();
+    }
+    lock.unlock();
 }
 
 void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
-        workers[i] = std::thread(work_4, i, ref(population), ref(input), ref(output1), ref(output2));
-    }
-    // cout << " initialization done";
-}
-
-void thread_pool_terminate(std::array<std::thread, NUM_THREADS_>& workers) {
-    termination_flag_ = true;
-
-    readyCount = NUM_THREADS_;
-    iterCount += 1;
-
-    for (int i = 0 ; i < NUM_THREADS_ ; i++) {
-        workers[i].join();
+        workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1), ref(output2));
     }
 }
 
-void runner_5() {
+void runner() {
     array<array<array<bool, size_>, size_>, populationSize_> population;
     for (auto& p : population)
         p = genMaze();
@@ -865,15 +610,16 @@ void runner_5() {
     #endif
 
     // save logic
-    vector<array<array<bool, size_>, size_>> niceOnes;
-    for (auto&p : population) {
-        auto result = fitness_3(p);
-        if (result > 0) {
-            // cout << "\n fitness: " << result;
-            niceOnes.push_back(p);
-        }
-    }
+    // vector<array<array<bool, size_>, size_>> niceOnes;
+    // for (auto&p : population) {
+    //     auto result = fitness_4(p);
+    //     if (result > 0) {
+    //         // cout << "\n fitness: " << result;
+    //         niceOnes.push_back(p);
+    //     }
+    // }
     // saveMazes_2(niceOnes, label);
+
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);
 }
@@ -881,6 +627,6 @@ void runner_5() {
 // g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o a
 int main() {
     init();
-    runner_5();
+    runner();
     return 0;
 }
