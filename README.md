@@ -9,7 +9,7 @@
 * Clone the repo
 * cd into the directory
 * Compile `genetic_3.cpp` with the following options: 
-    * For windows: g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o `executable_name` 
+    * For windows: g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o `executable_name`
     * For clang on OSX, use: g++ -std=c++17 -O3 -pthread -Wl,-stack_size,0x1000000 genetic_3.cpp -o `executable_name`
     * g++ on Linux: gcc -std=c++17 -pthread -O3 -Wl,-z,stack-size=16777216 genetic_3.cpp -o win2024
 * The program will generate mazes upto 120 in number of size 30*30, most of which will have a path from the upper left corner to the lower right corner.

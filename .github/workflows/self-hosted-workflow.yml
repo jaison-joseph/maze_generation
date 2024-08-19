@@ -14,4 +14,4 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Run date command
-      run: whoami
+      run: date
