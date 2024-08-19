@@ -1,0 +1,17 @@
+name: Self-Hosted Runner Workflow
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  run-on-self-hosted:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Run date command
+      run: date
