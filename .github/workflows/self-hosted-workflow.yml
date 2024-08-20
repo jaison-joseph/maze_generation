@@ -20,7 +20,7 @@ jobs:
       run: whoami
 
   run-on-ec2:
-    runs-on: Linux
+    runs-on: X64
 
     steps:
     - name: Checkout repository
