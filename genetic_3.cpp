@@ -12,11 +12,12 @@
 #include <thread>
 #if _WIN32
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 #elif __linux__
 #include <atomic>
 #endif
 
-#include <omp.h>
 
 using namespace std;
 
