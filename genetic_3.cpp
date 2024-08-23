@@ -67,7 +67,9 @@ void init() {
      * 
      * Does order of this impact performance? If so, by how much
     */
-    points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
+   /** original
+    * 
+    * points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
     points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
     points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
     points2pathIdxs[{{{ 0,  0}, {24,  6}}}] = {18, 19, 20, 21, 22, 23};
@@ -81,6 +83,21 @@ void init() {
     points2pathIdxs[{{{18, 12}, {24,  6}}}] = {0, 1, 3, 5, 6, 7, 9, 11, 16, 17, 22, 23};
     points2pathIdxs[{{{18, 12}, {29, 29}}}] = {1, 4, 7, 10, 18, 20};
     points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
+   */
+    points2pathIdxs[{{{ 6, 24}, {12, 18}}}] = {0, 1, 6, 7, 12, 14, 16, 17, 18, 20, 22, 23};
+    points2pathIdxs[{{{ 6, 24}, {18, 12}}}] = {2, 3, 6, 8, 10, 11, 12, 13, 19, 20, 21, 22};
+    points2pathIdxs[{{{ 6, 24}, {24,  6}}}] = {4, 5, 7, 8, 9, 10, 13, 14, 15, 16, 18, 19};
+    points2pathIdxs[{{{12, 18}, {24,  6}}}] = {1, 2, 3, 4, 10, 11, 12, 13, 15, 17, 20, 21};
+    points2pathIdxs[{{{12, 18}, {18, 12}}}] = {0, 2, 4, 5, 8, 9, 14, 15, 18, 19, 21, 23};
+    points2pathIdxs[{{{18, 12}, {24,  6}}}] = {0, 1, 3, 5, 6, 7, 9, 11, 16, 17, 22, 23};
+    points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
+    points2pathIdxs[{{{ 0,  0}, {24,  6}}}] = {18, 19, 20, 21, 22, 23};
+    points2pathIdxs[{{{ 6, 24}, {29, 29}}}] = {9, 11, 15, 17, 21, 23};
+    points2pathIdxs[{{{12, 18}, {29, 29}}}] = {3, 5, 13, 16, 19, 22};
+    points2pathIdxs[{{{18, 12}, {29, 29}}}] = {1, 4, 7, 10, 18, 20};
+    points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
+    points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
+    points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
 
     // Fill the vector with 10 RNGs, for example
     for (int i = 0; i < size_; ++i) {
@@ -149,54 +166,6 @@ array<array<bool, size_>, size_> genMaze() {
         }
     }
     return maze;
-}
-
-void uniformMutation(array<array<bool, size_>, size_>& m) {
-    for (int i = 0 ; i < size_ ; i++) {
-        for (int j = 0 ; j < size_ ; j++) {
-            if (getNum(rng) <= new_pm_) {
-                m[i][j] = !m[i][j];
-            }
-        }
-    }
-}
-
-void uniformMutation2(array<array<bool, size_>, size_>& m) {
-    #pragma clang loop vectorize(enable)
-    #pragma GCC ivdep
-    for (int i = 0 ; i < size_ ; i++) {
-        for (int j = 0 ; j < size_ ; j++) {
-            if (getNum(rngs[j]) <= new_pm_) {
-                m[i][j] = !m[i][j];
-            }
-        }
-    }
-}
-
-void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
-    for (int i = 0 ; i < size_ ; ++i) {
-        for (int j = 0 ; j < size_ ; ++j) {
-            if (getNum(rng) <= new_pc_) {
-                bool foo = m1[i][j] ^ m2[i][j];
-                m1[i][j] ^= foo;
-                m2[i][j] ^= foo;   
-            }
-        }
-    }
-}
-
-void uniformCrossover2(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
-    #pragma clang loop vectorize(enable)
-    #pragma GCC ivdep
-    for (int i = 0 ; i < size_ ; ++i) {
-        for (int j = 0 ; j < size_ ; ++j) {
-            if (getNum(rngs[j]) <= new_pc_) {
-                bool foo = m1[i][j] ^ m2[i][j];
-                m1[i][j] ^= foo;
-                m2[i][j] ^= foo;   
-            }
-        }
-    }
 }
 
 void uniformMutationAndCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
@@ -319,7 +288,7 @@ int pathFinder(
     return lk[end[0]][end[1]];
 }
 
-/*__attribute__((hot)) */int fitness_4(const array<array<bool, size_>, size_>& maze) {
+__attribute__((hot)) int fitness_4(const array<array<bool, size_>, size_>& maze) {
     
     if (maze[entrance_[0]][entrance_[1]] || maze[exit_[0]][exit_[1]]) {
         return 0;
@@ -609,9 +578,6 @@ void runner() {
             // cout << m1 << "\n\n" << m2;
 
             // evolution ....
-            // uniformCrossover2(m1, m2);
-            // uniformMutation2(m1);
-            // uniformMutation2(m2);
             uniformMutationAndCrossover(m1, m2);
 
             //not as performant as you'd think, the workload is too little

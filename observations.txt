@@ -38,3 +38,7 @@ LD_PRELOAD=/opt/homebrew/Cellar/gperftools/2.15/lib/libprofiler.0.dylib CPUPROFI
 file:///private/tmp/pprof75121.0.svg
 
 in the versions of runner with mutex/cv based thread communications, inlining the barrier method versus not doesn't seem to impact performance 
+
+On simba server purdue:
+alignas(128): 1:26
+*__attribute__((hot)): 1:21
