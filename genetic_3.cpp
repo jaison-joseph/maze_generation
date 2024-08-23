@@ -16,6 +16,8 @@
 #include <condition_variable>
 #elif __linux__
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 #endif
 
 
@@ -307,6 +309,8 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
 
     array<int, 24> pathDist;
     pathDist.fill(0);
+    // array<int, 24> pathDist __attribute__((aligned(32)));
+    // __builtin_memset(pathDist.data(), 0, sizeof(pathDist));
 
     // precompute pair-wise distances
     #pragma clang loop vectorize(enable)
@@ -317,6 +321,7 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
             pathDist[idx] += dist;
         }
     }
+
     bestResult = *min_element(pathDist.begin(), pathDist.end());
     if (bestResult >= 1'000'000)
         return 0;
