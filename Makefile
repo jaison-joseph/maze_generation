@@ -12,7 +12,7 @@ endif
 
 CXX = g++
 DEBUG_FLAGS = -g -fno-omit-frame-pointer
-COMMON_FLAGS = -std=c++17 -pthread -march=native -flto -fopt-info-vec-missed
+COMMON_FLAGS = -std=c++17 -pthread -march=native -flto
 CXXFLAGS = $(COMMON_FLAGS) 
 CXXFLAGS += $(if $(DEBUG),-Og $(DEBUG_FLAGS),-O3)
 CXXFLAGS += $(if $(OPENMP), $(OPENMP_INCLUDE),)
@@ -23,6 +23,7 @@ else ifeq ($(DETECTED_OS),Darwin)
     LDFLAGS := -Wl,-stack_size -Wl,0x1000000
 else ifeq ($(DETECTED_OS),Linux)
     LDFLAGS := -Wl,-z,stack-size=16777216
+	CXXFLAGS += -fopt-info-vec-missed
 else
     $(error Unsupported operating system: $(DETECTED_OS))
 endif

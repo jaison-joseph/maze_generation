@@ -159,6 +159,7 @@ void uniformMutation(array<array<bool, size_>, size_>& m) {
 
 void uniformMutation2(array<array<bool, size_>, size_>& m) {
     #pragma clang loop vectorize(enable)
+    #pragma GCC ivdep
     for (int i = 0 ; i < size_ ; i++) {
         for (int j = 0 ; j < size_ ; j++) {
             if (getNum(rngs[j]) <= new_pm_) {
@@ -182,6 +183,7 @@ void uniformCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, si
 
 void uniformCrossover2(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
     #pragma clang loop vectorize(enable)
+    #pragma GCC ivdep
     for (int i = 0 ; i < size_ ; ++i) {
         for (int j = 0 ; j < size_ ; ++j) {
             if (getNum(rngs[j]) <= new_pc_) {
@@ -314,6 +316,7 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
 
     // precompute pair-wise distances
     #pragma clang loop vectorize(enable)
+    #pragma GCC ivdep
     for (const auto& [key, value] : points2pathIdxs) {
         dist = pathFinder(maze, key[0], key[1]);
         // fill in paths
