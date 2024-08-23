@@ -331,6 +331,90 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
     return bestResult;
 }
 
+int fitness_5(const array<array<bool, size_>, size_>& maze) {
+    if (maze[entrance_[0]][entrance_[1]] || maze[exit_[0]][exit_[1]]) {
+        return 0;
+    }
+    for (auto& c : checkpoints_) {
+        if (maze[c[0]][c[1]]) {
+            return 0;
+        }
+    }
+ 
+    int totalDist, dist, bestResult;
+    bestResult = 1'000'000;
+
+    array<int, 24> pathDist;
+    pathDist.fill(0);
+
+    // Unrolled loop for pair-wise distances
+    dist = pathFinder(maze, {{0, 0}}, {{6, 24}});
+    pathDist[0] += dist; pathDist[1] += dist; pathDist[2] += dist;
+    pathDist[3] += dist; pathDist[4] += dist; pathDist[5] += dist;
+
+    dist = pathFinder(maze, {{0, 0}}, {{12, 18}});
+    pathDist[6] += dist; pathDist[7] += dist; pathDist[8] += dist;
+    pathDist[9] += dist; pathDist[10] += dist; pathDist[11] += dist;
+
+    dist = pathFinder(maze, {{0, 0}}, {{18, 12}});
+    pathDist[12] += dist; pathDist[13] += dist; pathDist[14] += dist;
+    pathDist[15] += dist; pathDist[16] += dist; pathDist[17] += dist;
+
+    dist = pathFinder(maze, {{0, 0}}, {{24, 6}});
+    pathDist[18] += dist; pathDist[19] += dist; pathDist[20] += dist;
+    pathDist[21] += dist; pathDist[22] += dist; pathDist[23] += dist;
+
+    dist = pathFinder(maze, {{6, 24}}, {{12, 18}});
+    pathDist[0] += dist; pathDist[1] += dist; pathDist[6] += dist; pathDist[7] += dist;
+    pathDist[12] += dist; pathDist[14] += dist; pathDist[16] += dist; pathDist[17] += dist;
+    pathDist[18] += dist; pathDist[20] += dist; pathDist[22] += dist; pathDist[23] += dist;
+
+    dist = pathFinder(maze, {{6, 24}}, {{18, 12}});
+    pathDist[2] += dist; pathDist[3] += dist; pathDist[6] += dist; pathDist[8] += dist;
+    pathDist[10] += dist; pathDist[11] += dist; pathDist[12] += dist; pathDist[13] += dist;
+    pathDist[19] += dist; pathDist[20] += dist; pathDist[21] += dist; pathDist[22] += dist;
+
+    dist = pathFinder(maze, {{6, 24}}, {{24, 6}});
+    pathDist[4] += dist; pathDist[5] += dist; pathDist[7] += dist; pathDist[8] += dist;
+    pathDist[9] += dist; pathDist[10] += dist; pathDist[13] += dist; pathDist[14] += dist;
+    pathDist[15] += dist; pathDist[16] += dist; pathDist[18] += dist; pathDist[19] += dist;
+
+    dist = pathFinder(maze, {{6, 24}}, {{29, 29}});
+    pathDist[9] += dist; pathDist[11] += dist; pathDist[15] += dist;
+    pathDist[17] += dist; pathDist[21] += dist; pathDist[23] += dist;
+
+    dist = pathFinder(maze, {{12, 18}}, {{18, 12}});
+    pathDist[0] += dist; pathDist[2] += dist; pathDist[4] += dist; pathDist[5] += dist;
+    pathDist[8] += dist; pathDist[9] += dist; pathDist[14] += dist; pathDist[15] += dist;
+    pathDist[18] += dist; pathDist[19] += dist; pathDist[21] += dist; pathDist[23] += dist;
+
+    dist = pathFinder(maze, {{12, 18}}, {{24, 6}});
+    pathDist[1] += dist; pathDist[2] += dist; pathDist[3] += dist; pathDist[4] += dist;
+    pathDist[10] += dist; pathDist[11] += dist; pathDist[12] += dist; pathDist[13] += dist;
+    pathDist[15] += dist; pathDist[17] += dist; pathDist[20] += dist; pathDist[21] += dist;
+
+    dist = pathFinder(maze, {{12, 18}}, {{29, 29}});
+    pathDist[3] += dist; pathDist[5] += dist; pathDist[13] += dist;
+    pathDist[16] += dist; pathDist[19] += dist; pathDist[22] += dist;
+
+    dist = pathFinder(maze, {{18, 12}}, {{24, 6}});
+    pathDist[0] += dist; pathDist[1] += dist; pathDist[3] += dist; pathDist[5] += dist;
+    pathDist[6] += dist; pathDist[7] += dist; pathDist[9] += dist; pathDist[11] += dist;
+    pathDist[16] += dist; pathDist[17] += dist; pathDist[22] += dist; pathDist[23] += dist;
+
+    dist = pathFinder(maze, {{18, 12}}, {{29, 29}});
+    pathDist[1] += dist; pathDist[4] += dist; pathDist[7] += dist;
+    pathDist[10] += dist; pathDist[18] += dist; pathDist[20] += dist;
+
+    dist = pathFinder(maze, {{24, 6}}, {{29, 29}});
+    pathDist[0] += dist; pathDist[2] += dist; pathDist[6] += dist;
+    pathDist[8] += dist; pathDist[12] += dist; pathDist[14] += dist;
+    
+    bestResult = *min_element(pathDist.begin(), pathDist.end());
+    if (bestResult >= 1'000'000)
+        return 0;
+    return bestResult;
+}
 
 void saveMazes_2(vector<array<array<bool, size_>, size_>>& mazes, string label) {
     ofstream myfile;
@@ -421,7 +505,7 @@ void work(int x, const populationType& population, const inputType& input, outpu
         localitercount += 1;
 
         // work
-        output1[x] = output2[x] = fitness_4(population[input[x]]);
+        output1[x] = output2[x] = fitness_5(population[input[x]]);
 
         // Inlined barrier_done
         lock.lock();
@@ -443,6 +527,7 @@ void work(int x, const populationType& population, const inputType& input, outpu
     lock.unlock();
 }
 
+// same as work, but records stats for the fitness_4 function
 void work_2(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     int localitercount = 0;
     std::unique_lock<std::mutex> lock(m, std::defer_lock); // Create the lock but don't lock immediately
@@ -621,7 +706,7 @@ void runner() {
             population[indices[i4]] = m2;
 
         // }
-        // cout << "\n sortedFitnesses: " << sortedFitnesses;
+        cout << "\n sortedFitnesses: " << sortedFitnesses;
     //    label = "\n";
     //    label += "-----------------------------";
     //    label += (" end of generation " + to_string(g+1) + ' ');
