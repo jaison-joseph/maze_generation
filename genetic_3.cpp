@@ -195,6 +195,26 @@ void uniformCrossover2(array<array<bool, size_>, size_>& m1, array<array<bool, s
     }
 }
 
+void uniformMutationAndCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
+    #pragma clang loop vectorize(enable)
+    #pragma GCC ivdep
+    for (int i = 0 ; i < size_ ; i++) {
+        for (int j = 0 ; j < size_ ; j++) {
+            if (getNum(rngs[i]) <= new_pm_) {
+                m1[i][j] = !m1[i][j];
+            }
+            if (getNum(rngs[i]) <= new_pm_) {
+                m2[i][j] = !m2[i][j];
+            }
+            if (getNum(rngs[i]) <= new_pc_) {
+                bool foo = m1[i][j] ^ m2[i][j];
+                m1[i][j] ^= foo;
+                m2[i][j] ^= foo;   
+            }
+        }
+    }
+}
+
 // returns min dist from entrance -> exit in maze
 // if no path, returns 1'000'000
 
@@ -331,91 +351,6 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
     return bestResult;
 }
 
-int fitness_5(const array<array<bool, size_>, size_>& maze) {
-    if (maze[entrance_[0]][entrance_[1]] || maze[exit_[0]][exit_[1]]) {
-        return 0;
-    }
-    for (auto& c : checkpoints_) {
-        if (maze[c[0]][c[1]]) {
-            return 0;
-        }
-    }
- 
-    int totalDist, dist, bestResult;
-    bestResult = 1'000'000;
-
-    array<int, 24> pathDist;
-    pathDist.fill(0);
-
-    // Unrolled loop for pair-wise distances
-    dist = pathFinder(maze, {{0, 0}}, {{6, 24}});
-    pathDist[0] += dist; pathDist[1] += dist; pathDist[2] += dist;
-    pathDist[3] += dist; pathDist[4] += dist; pathDist[5] += dist;
-
-    dist = pathFinder(maze, {{0, 0}}, {{12, 18}});
-    pathDist[6] += dist; pathDist[7] += dist; pathDist[8] += dist;
-    pathDist[9] += dist; pathDist[10] += dist; pathDist[11] += dist;
-
-    dist = pathFinder(maze, {{0, 0}}, {{18, 12}});
-    pathDist[12] += dist; pathDist[13] += dist; pathDist[14] += dist;
-    pathDist[15] += dist; pathDist[16] += dist; pathDist[17] += dist;
-
-    dist = pathFinder(maze, {{0, 0}}, {{24, 6}});
-    pathDist[18] += dist; pathDist[19] += dist; pathDist[20] += dist;
-    pathDist[21] += dist; pathDist[22] += dist; pathDist[23] += dist;
-
-    dist = pathFinder(maze, {{6, 24}}, {{12, 18}});
-    pathDist[0] += dist; pathDist[1] += dist; pathDist[6] += dist; pathDist[7] += dist;
-    pathDist[12] += dist; pathDist[14] += dist; pathDist[16] += dist; pathDist[17] += dist;
-    pathDist[18] += dist; pathDist[20] += dist; pathDist[22] += dist; pathDist[23] += dist;
-
-    dist = pathFinder(maze, {{6, 24}}, {{18, 12}});
-    pathDist[2] += dist; pathDist[3] += dist; pathDist[6] += dist; pathDist[8] += dist;
-    pathDist[10] += dist; pathDist[11] += dist; pathDist[12] += dist; pathDist[13] += dist;
-    pathDist[19] += dist; pathDist[20] += dist; pathDist[21] += dist; pathDist[22] += dist;
-
-    dist = pathFinder(maze, {{6, 24}}, {{24, 6}});
-    pathDist[4] += dist; pathDist[5] += dist; pathDist[7] += dist; pathDist[8] += dist;
-    pathDist[9] += dist; pathDist[10] += dist; pathDist[13] += dist; pathDist[14] += dist;
-    pathDist[15] += dist; pathDist[16] += dist; pathDist[18] += dist; pathDist[19] += dist;
-
-    dist = pathFinder(maze, {{6, 24}}, {{29, 29}});
-    pathDist[9] += dist; pathDist[11] += dist; pathDist[15] += dist;
-    pathDist[17] += dist; pathDist[21] += dist; pathDist[23] += dist;
-
-    dist = pathFinder(maze, {{12, 18}}, {{18, 12}});
-    pathDist[0] += dist; pathDist[2] += dist; pathDist[4] += dist; pathDist[5] += dist;
-    pathDist[8] += dist; pathDist[9] += dist; pathDist[14] += dist; pathDist[15] += dist;
-    pathDist[18] += dist; pathDist[19] += dist; pathDist[21] += dist; pathDist[23] += dist;
-
-    dist = pathFinder(maze, {{12, 18}}, {{24, 6}});
-    pathDist[1] += dist; pathDist[2] += dist; pathDist[3] += dist; pathDist[4] += dist;
-    pathDist[10] += dist; pathDist[11] += dist; pathDist[12] += dist; pathDist[13] += dist;
-    pathDist[15] += dist; pathDist[17] += dist; pathDist[20] += dist; pathDist[21] += dist;
-
-    dist = pathFinder(maze, {{12, 18}}, {{29, 29}});
-    pathDist[3] += dist; pathDist[5] += dist; pathDist[13] += dist;
-    pathDist[16] += dist; pathDist[19] += dist; pathDist[22] += dist;
-
-    dist = pathFinder(maze, {{18, 12}}, {{24, 6}});
-    pathDist[0] += dist; pathDist[1] += dist; pathDist[3] += dist; pathDist[5] += dist;
-    pathDist[6] += dist; pathDist[7] += dist; pathDist[9] += dist; pathDist[11] += dist;
-    pathDist[16] += dist; pathDist[17] += dist; pathDist[22] += dist; pathDist[23] += dist;
-
-    dist = pathFinder(maze, {{18, 12}}, {{29, 29}});
-    pathDist[1] += dist; pathDist[4] += dist; pathDist[7] += dist;
-    pathDist[10] += dist; pathDist[18] += dist; pathDist[20] += dist;
-
-    dist = pathFinder(maze, {{24, 6}}, {{29, 29}});
-    pathDist[0] += dist; pathDist[2] += dist; pathDist[6] += dist;
-    pathDist[8] += dist; pathDist[12] += dist; pathDist[14] += dist;
-    
-    bestResult = *min_element(pathDist.begin(), pathDist.end());
-    if (bestResult >= 1'000'000)
-        return 0;
-    return bestResult;
-}
-
 void saveMazes_2(vector<array<array<bool, size_>, size_>>& mazes, string label) {
     ofstream myfile;
     myfile.open ("genetic_3_results_save_2.txt");
@@ -505,7 +440,7 @@ void work(int x, const populationType& population, const inputType& input, outpu
         localitercount += 1;
 
         // work
-        output1[x] = output2[x] = fitness_5(population[input[x]]);
+        output1[x] = output2[x] = fitness_4(population[input[x]]);
 
         // Inlined barrier_done
         lock.lock();
@@ -667,9 +602,10 @@ void runner() {
             // cout << m1 << "\n\n" << m2;
 
             // evolution ....
-            uniformCrossover2(m1, m2);
-            uniformMutation2(m1);
-            uniformMutation2(m2);
+            // uniformCrossover2(m1, m2);
+            // uniformMutation2(m1);
+            // uniformMutation2(m2);
+            uniformMutationAndCrossover(m1, m2);
 
             //not as performant as you'd think, the workload is too little
             // #pragma omp parallel sections
