@@ -63,6 +63,10 @@ void init() {
         pathFinder_lk_[i].fill(1'000'000);
     }
 
+    /**
+     * 
+     * Does order of this impact performance? If so, by how much
+    */
     points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
     points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
     points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
@@ -79,9 +83,9 @@ void init() {
     points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
 
     // Fill the vector with 10 RNGs, for example
-for (int i = 0; i < size_; ++i) {
-    rngs.emplace_back(random_device{}());
-}
+    for (int i = 0; i < size_; ++i) {
+        rngs.emplace_back(random_device{}());
+    }
 
 }
 
@@ -200,6 +204,7 @@ void uniformMutationAndCrossover(array<array<bool, size_>, size_>& m1, array<arr
     #pragma GCC ivdep
     for (int i = 0 ; i < size_ ; i++) {
         for (int j = 0 ; j < size_ ; j++) {
+            // notice how we use rngs[i] instead of rngs[j]; less cache misses?
             if (getNum(rngs[i]) <= new_pm_) {
                 m1[i][j] = !m1[i][j];
             }
@@ -225,7 +230,8 @@ void uniformMutationAndCrossover(array<array<bool, size_>, size_>& m1, array<arr
 int pathFinder(
     const array<array<bool, size_>, size_>& maze,
     const array<int, 2>& start, 
-    const array<int, 2>& end
+    const array<int, 2>& end,
+    array<array<int, size_>, size_>& lk
 ) {
     // fitness() already checks the same, this is (I think) redundant
     // if (maze[start[0]][start[1]]) {
@@ -235,7 +241,6 @@ int pathFinder(
     //     return 0;
     // }
 
-    array<array<int, size_>, size_> lk = pathFinder_lk_;
     // thread_local array<array<int, size_>, size_> lk;
     // for (int i = 0 ; i < size_ ; ++i) {
     //     pathFinder_lk_[i].fill(1'000'000);
@@ -314,7 +319,7 @@ int pathFinder(
     return lk[end[0]][end[1]];
 }
 
-int fitness_4(const array<array<bool, size_>, size_>& maze) {
+/*__attribute__((hot)) */int fitness_4(const array<array<bool, size_>, size_>& maze) {
     
     if (maze[entrance_[0]][entrance_[1]] || maze[exit_[0]][exit_[1]]) {
         return 0;
@@ -329,7 +334,9 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
     int key;
     bestResult = 1'000'000;
 
-    array<int, 24> pathDist;
+    array<array<int, size_>, size_> lk = pathFinder_lk_;
+
+    alignas(128) array<int, 24> pathDist;
     pathDist.fill(0);
     // array<int, 24> pathDist __attribute__((aligned(32)));
     // __builtin_memset(pathDist.data(), 0, sizeof(pathDist));
@@ -338,7 +345,7 @@ int fitness_4(const array<array<bool, size_>, size_>& maze) {
     #pragma clang loop vectorize(enable)
     #pragma GCC ivdep
     for (const auto& [key, value] : points2pathIdxs) {
-        dist = pathFinder(maze, key[0], key[1]);
+        dist = pathFinder(maze, key[0], key[1], lk);
         // fill in paths
         for (const int& idx : value) {
             pathDist[idx] += dist;
@@ -642,7 +649,7 @@ void runner() {
             population[indices[i4]] = m2;
 
         // }
-        cout << "\n sortedFitnesses: " << sortedFitnesses;
+        // cout << "\n sortedFitnesses: " << sortedFitnesses;
     //    label = "\n";
     //    label += "-----------------------------";
     //    label += (" end of generation " + to_string(g+1) + ' ');
