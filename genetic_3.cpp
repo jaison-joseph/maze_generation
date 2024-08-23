@@ -169,21 +169,19 @@ array<array<bool, size_>, size_> genMaze() {
 }
 
 void uniformMutationAndCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
-    #pragma clang loop vectorize(enable)
-    #pragma GCC ivdep
     for (int i = 0 ; i < size_ ; i++) {
         for (int j = 0 ; j < size_ ; j++) {
             // notice how we use rngs[i] instead of rngs[j]; less cache misses?
+            if (getNum(rngs[i]) <= new_pc_) {
+                bool foo = m1[i][j] ^ m2[i][j];
+                m1[i][j] ^= foo;
+                m2[i][j] ^= foo;   
+            }
             if (getNum(rngs[i]) <= new_pm_) {
                 m1[i][j] = !m1[i][j];
             }
             if (getNum(rngs[i]) <= new_pm_) {
                 m2[i][j] = !m2[i][j];
-            }
-            if (getNum(rngs[i]) <= new_pc_) {
-                bool foo = m1[i][j] ^ m2[i][j];
-                m1[i][j] ^= foo;
-                m2[i][j] ^= foo;   
             }
         }
     }
@@ -199,8 +197,7 @@ void uniformMutationAndCrossover(array<array<bool, size_>, size_>& m1, array<arr
 int pathFinder(
     const array<array<bool, size_>, size_>& maze,
     const array<int, 2>& start, 
-    const array<int, 2>& end,
-    array<array<int, size_>, size_>& lk
+    const array<int, 2>& end
 ) {
     // fitness() already checks the same, this is (I think) redundant
     // if (maze[start[0]][start[1]]) {
@@ -214,7 +211,9 @@ int pathFinder(
     // for (int i = 0 ; i < size_ ; ++i) {
     //     pathFinder_lk_[i].fill(1'000'000);
     // }
+    array<array<int, size_>, size_> lk = pathFinder_lk_;
     lk[start[0]][start[1]] = 0;
+
 
     vector<int> q = {};
     q.reserve(100);
@@ -240,7 +239,7 @@ int pathFinder(
             continue;
 
         // foo = {pt[0]+1, pt[1]};
-        x++;
+        x++; // (1, 0)
         if (x < size_ && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
             if (x != e1 || y != e2) {
@@ -251,7 +250,7 @@ int pathFinder(
 
         // foo = {pt[0], pt[1]+1};
         x--;
-        y++;
+        y++; // (0, 1)
         if (y < size_ && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
             if (x != e1 || y != e2) {
@@ -261,7 +260,7 @@ int pathFinder(
         }
         // foo = {pt[0]-1, pt[1]};
         x--;
-        y--;
+        y--; // (-1, 0)
         if (x >= 0 && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
             if (x != e1 || y != e2) {
@@ -272,7 +271,7 @@ int pathFinder(
 
         // foo = {pt[0], pt[1]-1};
         x++;
-        y--;
+        y--; // (0, -1)
         if (y >= 0 && lk[x][y] > dist && !maze[x][y]) {
             lk [x] [y] = dist;
             if (x != e1 || y != e2) {
@@ -303,18 +302,14 @@ __attribute__((hot)) int fitness_4(const array<array<bool, size_>, size_>& maze)
     int key;
     bestResult = 1'000'000;
 
-    array<array<int, size_>, size_> lk = pathFinder_lk_;
-
     alignas(128) array<int, 24> pathDist;
     pathDist.fill(0);
     // array<int, 24> pathDist __attribute__((aligned(32)));
     // __builtin_memset(pathDist.data(), 0, sizeof(pathDist));
 
     // precompute pair-wise distances
-    #pragma clang loop vectorize(enable)
-    #pragma GCC ivdep
     for (const auto& [key, value] : points2pathIdxs) {
-        dist = pathFinder(maze, key[0], key[1], lk);
+        dist = pathFinder(maze, key[0], key[1]);
         // fill in paths
         for (const int& idx : value) {
             pathDist[idx] += dist;
@@ -579,7 +574,6 @@ void runner() {
 
             // evolution ....
             uniformMutationAndCrossover(m1, m2);
-
             //not as performant as you'd think, the workload is too little
             // #pragma omp parallel sections
             // {
@@ -615,7 +609,7 @@ void runner() {
             population[indices[i4]] = m2;
 
         // }
-        // cout << "\n sortedFitnesses: " << sortedFitnesses;
+        cout << "\n sortedFitnesses: " << sortedFitnesses;
     //    label = "\n";
     //    label += "-----------------------------";
     //    label += (" end of generation " + to_string(g+1) + ' ');
@@ -638,15 +632,15 @@ void runner() {
     #endif
 
     // save logic
-    // vector<array<array<bool, size_>, size_>> niceOnes;
-    // for (auto&p : population) {
-    //     auto result = fitness_4(p);
-    //     if (result > 0) {
-    //         // cout << "\n fitness: " << result;
-    //         niceOnes.push_back(p);
-    //     }
-    // }
-    // saveMazes_2(niceOnes, label);
+    vector<array<array<bool, size_>, size_>> niceOnes;
+    for (auto&p : population) {
+        auto result = fitness_4(p);
+        if (result > 0) {
+            cout << "\n fitness: " << result;
+            niceOnes.push_back(p);
+        }
+    }
+    saveMazes_2(niceOnes, label);
 
     // saveGenerationStats(generationStats);
     // saveMatingEventStats(matingEventStats);
@@ -658,3 +652,10 @@ int main() {
     runner();
     return 0;
 }
+
+/***
+ * 
+ * observations on fixing:
+ * 
+ * the problem lies in pathFinder/fitness function
+*/
