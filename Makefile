@@ -11,7 +11,7 @@ CXXFLAGS = $(COMMON_FLAGS)
 CXXFLAGS += $(if $(DEBUG),-Og $(DEBUG_FLAGS),-O3)
 CXXFLAGS += $(if $(OPENMP), $(OPENMP_INCLUDE),)
 LDFLAGS = -Wl,-stack_size -Wl,0x1000000
-CXXFLAGS += $(if $(OPENMP), $(OPENMP_LINK),)
+LDFLAGS += $(if $(OPENMP), $(OPENMP_LINK),)
 
 # The name of your executable
 EXECUTABLE = foobar
