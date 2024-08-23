@@ -1,13 +1,17 @@
 # for debug build: make DEBUG=1
 # otherwise: make
 
+OPENMP_INCLUDE =  -fopenmp -I/opt/homebrew/opt/libomp/include
+OPENMP_LINK = -L/opt/homebrew/opt/libomp/lib -lomp
+
 CXX = g++
 DEBUG_FLAGS = -g -fno-omit-frame-pointer
-COMMON_FLAGS = -std=c++17 -pthread -march=native -flto -Xclang -fopenmp -I/opt/homebrew/opt/libomp/include
-VECTORIZE_FLAGS = -fvectorize -fslp-vectorize -fveclib=libmvec
-CXXFLAGS = $(COMMON_FLAGS) $(VECTORIZE_FLAGS)
+COMMON_FLAGS = -std=c++17 -pthread -march=native -flto
+CXXFLAGS = $(COMMON_FLAGS) 
 CXXFLAGS += $(if $(DEBUG),-Og $(DEBUG_FLAGS),-O3)
-LDFLAGS = -Wl,-stack_size -Wl,0x1000000 -L/opt/homebrew/opt/libomp/lib -lomp
+CXXFLAGS += $(if $(OPENMP), $(OPENMP_INCLUDE),)
+LDFLAGS = -Wl,-stack_size -Wl,0x1000000
+CXXFLAGS += $(if $(OPENMP), $(OPENMP_LINK),)
 
 # The name of your executable
 EXECUTABLE = foobar
