@@ -20,6 +20,8 @@
 #include <condition_variable>
 #endif
 
+// #define SAVE_MAZES 1
+
 
 using namespace std;
 
@@ -50,8 +52,23 @@ uniform_int_distribution<mt19937::result_type> getNum(1,rng_upper_bound_); // di
 const int new_pm_ = rng_upper_bound_ * Pm_;
 const int new_pc_ = rng_upper_bound_ * Pc_;
 
-std::vector<std::mt19937> rngs;
-std::random_device rd;
+const int NUM_THREADS_ = 7;
+typedef array<array<array<bool, size_>, size_>, populationSize_> populationType;
+typedef array<int, 7> inputType;
+typedef array<int, 7> outputType;
+std::array<int, 7> threadInputs;
+
+/**** VERSION 2 */
+std::mutex m;                       // for the 2 cv's below
+std::condition_variable cond;       // for lock-step
+std::condition_variable cond_cc;    // to hold threads ahead of the rest
+int num_threads;                    // used by barrier logic, represents number of active thread workers, decremented on exit
+int waiting_for_increment;          // number of threads past cond_cc, waiting for cond
+int global_cc;                      // global counter for number of iterations, increment to run another round of worker thread work
+bool termination_flag_;             // set to true to get worker threads to complete execution
+std::mutex barrier_mutex;           // for the main thread to wait, until all threads have finished task
+bool barrier_completed;             // also for the main thread
+std::condition_variable barrier_cv; // also for the main thread
 
 
 #ifdef DEBUG_COUNT
@@ -67,43 +84,20 @@ void init() {
      * 
      * Does order of this impact performance? If so, by how much
     */
-   /** original
-    * 
-    * points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
-    points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
-    points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
-    points2pathIdxs[{{{ 0,  0}, {24,  6}}}] = {18, 19, 20, 21, 22, 23};
-    points2pathIdxs[{{{ 6, 24}, {12, 18}}}] = {0, 1, 6, 7, 12, 14, 16, 17, 18, 20, 22, 23};
-    points2pathIdxs[{{{ 6, 24}, {18, 12}}}] = {2, 3, 6, 8, 10, 11, 12, 13, 19, 20, 21, 22};
-    points2pathIdxs[{{{ 6, 24}, {24,  6}}}] = {4, 5, 7, 8, 9, 10, 13, 14, 15, 16, 18, 19};
-    points2pathIdxs[{{{ 6, 24}, {29, 29}}}] = {9, 11, 15, 17, 21, 23};
-    points2pathIdxs[{{{12, 18}, {18, 12}}}] = {0, 2, 4, 5, 8, 9, 14, 15, 18, 19, 21, 23};
-    points2pathIdxs[{{{12, 18}, {24,  6}}}] = {1, 2, 3, 4, 10, 11, 12, 13, 15, 17, 20, 21};
-    points2pathIdxs[{{{12, 18}, {29, 29}}}] = {3, 5, 13, 16, 19, 22};
-    points2pathIdxs[{{{18, 12}, {24,  6}}}] = {0, 1, 3, 5, 6, 7, 9, 11, 16, 17, 22, 23};
-    points2pathIdxs[{{{18, 12}, {29, 29}}}] = {1, 4, 7, 10, 18, 20};
-    points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
-   */
-    points2pathIdxs[{{{ 6, 24}, {12, 18}}}] = {0, 1, 6, 7, 12, 14, 16, 17, 18, 20, 22, 23};
-    points2pathIdxs[{{{ 6, 24}, {18, 12}}}] = {2, 3, 6, 8, 10, 11, 12, 13, 19, 20, 21, 22};
-    points2pathIdxs[{{{ 6, 24}, {24,  6}}}] = {4, 5, 7, 8, 9, 10, 13, 14, 15, 16, 18, 19};
-    points2pathIdxs[{{{12, 18}, {24,  6}}}] = {1, 2, 3, 4, 10, 11, 12, 13, 15, 17, 20, 21};
-    points2pathIdxs[{{{12, 18}, {18, 12}}}] = {0, 2, 4, 5, 8, 9, 14, 15, 18, 19, 21, 23};
-    points2pathIdxs[{{{18, 12}, {24,  6}}}] = {0, 1, 3, 5, 6, 7, 9, 11, 16, 17, 22, 23};
-    points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
-    points2pathIdxs[{{{ 0,  0}, {24,  6}}}] = {18, 19, 20, 21, 22, 23};
-    points2pathIdxs[{{{ 6, 24}, {29, 29}}}] = {9, 11, 15, 17, 21, 23};
-    points2pathIdxs[{{{12, 18}, {29, 29}}}] = {3, 5, 13, 16, 19, 22};
-    points2pathIdxs[{{{18, 12}, {29, 29}}}] = {1, 4, 7, 10, 18, 20};
-    points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
-    points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
     points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
-
-    // Fill the vector with 10 RNGs, for example
-    for (int i = 0; i < size_; ++i) {
-        rngs.emplace_back(random_device{}());
-    }
-
+    points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
+    points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
+    points2pathIdxs[{{{ 0,  0}, {24,  6}}}] = {18, 19, 20, 21, 22, 23};
+    points2pathIdxs[{{{ 6, 24}, {12, 18}}}] = {0, 1, 6, 7, 12, 14, 16, 17, 18, 20, 22, 23};
+    points2pathIdxs[{{{ 6, 24}, {18, 12}}}] = {2, 3, 6, 8, 10, 11, 12, 13, 19, 20, 21, 22};
+    points2pathIdxs[{{{ 6, 24}, {24,  6}}}] = {4, 5, 7, 8, 9, 10, 13, 14, 15, 16, 18, 19};
+    points2pathIdxs[{{{ 6, 24}, {29, 29}}}] = {9, 11, 15, 17, 21, 23};
+    points2pathIdxs[{{{12, 18}, {18, 12}}}] = {0, 2, 4, 5, 8, 9, 14, 15, 18, 19, 21, 23};
+    points2pathIdxs[{{{12, 18}, {24,  6}}}] = {1, 2, 3, 4, 10, 11, 12, 13, 15, 17, 20, 21};
+    points2pathIdxs[{{{12, 18}, {29, 29}}}] = {3, 5, 13, 16, 19, 22};
+    points2pathIdxs[{{{18, 12}, {24,  6}}}] = {0, 1, 3, 5, 6, 7, 9, 11, 16, 17, 22, 23};
+    points2pathIdxs[{{{18, 12}, {29, 29}}}] = {1, 4, 7, 10, 18, 20};
+    points2pathIdxs[{{{24,  6}, {29, 29}}}] = {0, 2, 6, 8, 12, 14};
 }
 
 // overload of << for a maze
@@ -171,16 +165,15 @@ array<array<bool, size_>, size_> genMaze() {
 void uniformMutationAndCrossover(array<array<bool, size_>, size_>& m1, array<array<bool, size_>, size_>& m2) {
     for (int i = 0 ; i < size_ ; i++) {
         for (int j = 0 ; j < size_ ; j++) {
-            // notice how we use rngs[i] instead of rngs[j]; less cache misses?
-            if (getNum(rngs[i]) <= new_pc_) {
+            if (getNum(rng) <= new_pc_) {
                 bool foo = m1[i][j] ^ m2[i][j];
                 m1[i][j] ^= foo;
                 m2[i][j] ^= foo;   
             }
-            if (getNum(rngs[i]) <= new_pm_) {
+            if (getNum(rng) <= new_pm_) {
                 m1[i][j] = !m1[i][j];
             }
-            if (getNum(rngs[i]) <= new_pm_) {
+            if (getNum(rng) <= new_pm_) {
                 m2[i][j] = !m2[i][j];
             }
         }
@@ -322,7 +315,7 @@ __attribute__((hot)) int fitness_4(const array<array<bool, size_>, size_>& maze)
     return bestResult;
 }
 
-void saveMazes_2(vector<array<array<bool, size_>, size_>>& mazes, string label) {
+void saveMazes(vector<array<array<bool, size_>, size_>>& mazes, string label) {
     ofstream myfile;
     myfile.open ("genetic_3_results_save_2.txt");
     myfile << label;
@@ -331,50 +324,6 @@ void saveMazes_2(vector<array<array<bool, size_>, size_>>& mazes, string label) 
     }
     myfile.close();
 }
-
-
-// void saveMatingEventStats(vector<vector<int>>& stats) {
-void saveMatingEventStats(array<array<int, 7>, totalMatingEvents_>& stats) {
-    ofstream myfile;
-    myfile.open ("matingEventStats.txt");
-    for (auto& row : stats) {
-        myfile << row << '\n';
-    }
-    myfile.close();
-}
-
-// void saveGenerationStats(vector<vector<int>>& stats) {
-void saveGenerationStats(array<array<int, populationSize_>, generations_>& stats) {
-    ofstream myfile;
-    myfile.open ("generationStats.txt");
-    for (auto& row : stats) {
-        for (auto& n : row) {
-            myfile << n << ", ";
-        }
-        myfile << '\n';
-    }
-    myfile.close();
-}
-
-#define USE_REFERENCES 1;
-
-const int NUM_THREADS_ = 7;
-typedef array<array<array<bool, size_>, size_>, populationSize_> populationType;
-typedef array<int, 7> inputType;
-typedef array<int, 7> outputType;
-std::array<int, 7> threadInputs;
-
-/**** VERSION 2 */
-std::mutex m;                       // for the 2 cv's below
-std::condition_variable cond;       // for lock-step
-std::condition_variable cond_cc;    // to hold threads ahead of the rest
-int num_threads;                    // used by barrier logic, represents number of active thread workers, decremented on exit
-int waiting_for_increment;          // number of threads past cond_cc, waiting for cond
-int global_cc;                      // global counter for number of iterations, increment to run another round of worker thread work
-bool termination_flag_;             // set to true to get worker threads to complete execution
-std::mutex barrier_mutex;           // for the main thread to wait, until all threads have finished task
-bool barrier_completed;             // also for the main thread
-std::condition_variable barrier_cv; // also for the main thread
 
 void barrier_init(const int& n) {
     num_threads = n;
@@ -530,92 +479,84 @@ void runner() {
     
     for (int g = 0 ; g < numIterations_ ; ++g) {
 
-            barrier_completed = false;
+        barrier_completed = false;
 
-            for (int i = 0 ; i < 7 ; i++) {
-                indices[i] = sample_getNum(sample_rng);
-            }
+        for (int i = 0 ; i < 7 ; i++) {
+            indices[i] = sample_getNum(sample_rng);
+        }
 
-            global_cc++;
-            cond_cc.notify_all();
-            {
-                std::unique_lock<std::mutex> lock(m);
-                barrier_cv.wait(lock, []{ return barrier_completed; });
-            }
+        global_cc++;
+        cond_cc.notify_all();
+        {
+            std::unique_lock<std::mutex> lock(m);
+            barrier_cv.wait(lock, []{ return barrier_completed; });
+        }
 
-            // since we passed a ref of outputs to each thread, no copying from threadOutput -> wherever it was supposed to be
+        // since we passed a ref of outputs to each thread, no copying from threadOutput -> wherever it was supposed to be
 
-            // auto end = chrono::steady_clock::now();
-            // auto diff = end-start;
-            // cout<<"\n time: "<< chrono::duration<double, milli>(diff).count()<<" ms";
-            
-            // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
-            // find the fittest two members
-            // the fitnesses are sorted in descending order
-            sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
+        // auto end = chrono::steady_clock::now();
+        // auto diff = end-start;
+        // cout<<"\n time: "<< chrono::duration<double, milli>(diff).count()<<" ms";
+        
+        // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
+        // find the fittest two members
+        // the fitnesses are sorted in descending order
+        sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
 
-            // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
-            // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
-            i1 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[0]) - fitnesses.begin();
-            i2 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[1]) - fitnesses.begin();
-            // i1 and i2 cannot be the same
-            while (i1 == i2 || fitnesses[i2] != sortedFitnesses[1]) {
-                i2 = (i2 + 1)%7;
-            }
+        // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
+        // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
+        i1 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[0]) - fitnesses.begin();
+        i2 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[1]) - fitnesses.begin();
+        // i1 and i2 cannot be the same
+        while (i1 == i2 || fitnesses[i2] != sortedFitnesses[1]) {
+            i2 = (i2 + 1)%7;
+        }
 
-            // cout << "\n i1: " << i1 << " | i2: " << i2 ;
+        // cout << "\n i1: " << i1 << " | i2: " << i2 ;
 
-            // m1 and m2 are copies of the two fittest mazes
-            m1 = population[indices[i1]];
-            m2 = population[indices[i2]];
+        // m1 and m2 are copies of the two fittest mazes
+        m1 = population[indices[i1]];
+        m2 = population[indices[i2]];
 
-            // cout << "\n m1 and m2 BEFORE evolution: \n";
-            // cout << m1 << "\n\n" << m2;
+        // cout << "\n m1 and m2 BEFORE evolution: \n";
+        // cout << m1 << "\n\n" << m2;
 
-            // evolution ....
-            uniformMutationAndCrossover(m1, m2);
-            //not as performant as you'd think, the workload is too little
-            // #pragma omp parallel sections
-            // {
-            //     #pragma omp section
-            //     {
-            //         uniformMutation2(m1);
-            //     }
-            //     #pragma omp section
-            //     {
-            //         uniformMutation2(m2);
-            //     }
-            // }
-            
-
-            // cout << "\n m1 and m2 AFTER evolution: \n";
-            // cout << m1 << "\n\n" << m2;
-
-            // now i3 and i4 will contain indces of the weakest 2 elements
-            i3 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[6]) - fitnesses.begin();
-            i4 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[5]) - fitnesses.begin();
-            // i1, i2, i3 and i4 have to be different cannot be the same
-            while (i3 == i1 || i3 == i2 || fitnesses[i3] != sortedFitnesses[6]) {
-                i3 = (i3 + 1)%7;
-            }
-            while (i4 == i1 || i4 == i2 || i4 == i3 || fitnesses[i4] != sortedFitnesses[5]) {
-                i4 = (i4 + 1)%7;
-            }
-
-            // cout << "\n i3: " << i3 << " | i4: " << i4 ;
-
-            // overwrite the weakest two with the modified fittest two
-            population[indices[i3]] = m1;
-            population[indices[i4]] = m2;
-
+        // evolution ....
+        uniformMutationAndCrossover(m1, m2);
+        //not as performant as you'd think, the workload is too little
+        // #pragma omp parallel sections
+        // {
+        //     #pragma omp section
+        //     {
+        //         uniformMutation2(m1);
+        //     }
+        //     #pragma omp section
+        //     {
+        //         uniformMutation2(m2);
+        //     }
         // }
-        cout << "\n sortedFitnesses: " << sortedFitnesses;
-    //    label = "\n";
-    //    label += "-----------------------------";
-    //    label += (" end of generation " + to_string(g+1) + ' ');
-    //    label += "-----------------------------";
-    //    label += '\n';
-    //    cout << label;
+        
+
+        // cout << "\n m1 and m2 AFTER evolution: \n";
+        // cout << m1 << "\n\n" << m2;
+
+        // now i3 and i4 will contain indces of the weakest 2 elements
+        i3 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[6]) - fitnesses.begin();
+        i4 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[5]) - fitnesses.begin();
+        // i1, i2, i3 and i4 have to be different cannot be the same
+        while (i3 == i1 || i3 == i2 || fitnesses[i3] != sortedFitnesses[6]) {
+            i3 = (i3 + 1)%7;
+        }
+        while (i4 == i1 || i4 == i2 || i4 == i3 || fitnesses[i4] != sortedFitnesses[5]) {
+            i4 = (i4 + 1)%7;
+        }
+
+        // cout << "\n i3: " << i3 << " | i4: " << i4 ;
+
+        // overwrite the weakest two with the modified fittest two
+        population[indices[i3]] = m1;
+        population[indices[i4]] = m2;
+        // cout << "\n sortedFitnesses: " << sortedFitnesses;
     }
     
     // terminate workers, join threads
@@ -631,6 +572,7 @@ void runner() {
     cout << "pathfinder call count: " << debug_pathFinderCount << endl;
     #endif
 
+    #ifdef SAVE_MAZES
     // save logic
     vector<array<array<bool, size_>, size_>> niceOnes;
     for (auto&p : population) {
@@ -640,10 +582,8 @@ void runner() {
             niceOnes.push_back(p);
         }
     }
-    saveMazes_2(niceOnes, label);
-
-    // saveGenerationStats(generationStats);
-    // saveMatingEventStats(matingEventStats);
+    saveMazes(niceOnes, label);
+    #endif
 }
 
 // g++ -std=c++17 -O3 -Wl,--stack=16777216 -pthread genetic_3.cpp -o a
@@ -652,10 +592,3 @@ int main() {
     runner();
     return 0;
 }
-
-/***
- * 
- * observations on fixing:
- * 
- * the problem lies in pathFinder/fitness function
-*/
