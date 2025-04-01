@@ -42,3 +42,13 @@ in the versions of runner with mutex/cv based thread communications, inlining th
 On simba server purdue:
 alignas(128): 1:26
 *__attribute__((hot)): 1:21
+
+Update: for profiling (MacOs):
+	installed go for pprof, installed gperftools
+	see updated makefile comments
+	export CPUPROFILE=profiling/prof.out
+	./foobar
+
+pprof --gv ./foobar ./profiling/prof.out
+
+pprof ./foobar ./profiling/prof.out

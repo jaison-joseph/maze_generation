@@ -22,6 +22,14 @@
 
 // #define SAVE_MAZES 1
 
+/**
+ * TODO:
+ * we can divide the probability space of 120 into 7 regions, and each thread can then individually pick a maze from it's subspace
+ * this should make thhings a little more faster
+ * 
+*/
+
+#include "something.cpp"
 
 using namespace std;
 
@@ -450,6 +458,8 @@ void work_2(int x, const populationType& population, const inputType& input, out
 void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
         workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1), ref(output2));
+		set_thread_max_priority(std::ref(workers[i]));
+		// pin_cpu(workers[i], i);
     }
 }
 
