@@ -314,55 +314,6 @@ int pathFinder(
     return lk[end[0]][end[1]];
 }
 
-int pathFinder_optimized(
-    const array<array<bool, size_>, size_>& maze,
-    const array<int, 2>& start, 
-    const array<int, 2>& end
-) {
-	array<array<int, size_>, size_> lk = pathFinder_lk_;
-    lk[start[0]][start[1]] = 0;
-    
-    // Use std::queue instead of vector
-    std::queue<std::pair<int, int>> q;
-    q.push({start[0], start[1]});
-    
-    const int e1 = end[0];
-    const int e2 = end[1];
-    
-    // Direction offsets: right, down, left, up
-    const int dx[4] = {1, 0, -1, 0};
-    const int dy[4] = {0, 1, 0, -1};
-
-    while (!q.empty()) {
-        // Instead of back(), use front() with queue
-        auto [x, y] = q.front();
-        q.pop();
-        
-        int dist = lk[x][y] + 1;
-        
-        if (dist > lk[end[0]][end[1]]) 
-            continue;
-
-        // Check all four directions
-        for (int i = 0; i < 4; i++) {
-            int nx = x + dx[i];
-            int ny = y + dy[i];
-            
-            // Bounds checking
-            if (nx < 0 || nx >= size_ || ny < 0 || ny >= size_)
-                continue;
-                
-            if (lk[nx][ny] > dist && !maze[nx][ny]) {
-                lk[nx][ny] = dist;
-                if (nx != e1 || ny != e2) {
-                    q.push({nx, ny});
-                }
-            }
-        }
-    }
-    
-    return lk[end[0]][end[1]];
-}
 __attribute__((hot)) int fitness_4(const array<array<bool, size_>, size_>& maze) {
     
     if (maze[entrance_[0]][entrance_[1]] || maze[exit_[0]][exit_[1]]) {
@@ -385,7 +336,6 @@ __attribute__((hot)) int fitness_4(const array<array<bool, size_>, size_>& maze)
 
     // precompute pair-wise distances
     for (const auto& [key, value] : points2pathIdxs) {
-        // dist = pathFinder_optimized(maze, key[0], key[1]);
         dist = pathFinder(maze, key[0], key[1]);
         // fill in paths
         for (const int& idx : value) {
@@ -417,7 +367,7 @@ void barrier_init(const int& n) {
     global_cc = -1;
 }
 
-void work(int x, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
+void work(int x, const populationType& population, const inputType& input, outputType& output1) {
     int localitercount = 0;
     std::unique_lock<std::mutex> lock(m, std::defer_lock); // Create the lock but don't lock immediately
 
@@ -444,7 +394,7 @@ void work(int x, const populationType& population, const inputType& input, outpu
         localitercount += 1;
 
         // work
-        output1[x] = output2[x] = fitness_4(population[input[x]]);
+        output1[x] = fitness_4(population[input[x]]);
 
         // Inlined barrier_done
         lock.lock();
@@ -531,9 +481,9 @@ void work_2(int x, const populationType& population, const inputType& input, out
     lock.unlock();
 }
 
-void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, const populationType& population, const inputType& input, outputType& output1, outputType& output2) {
+void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, const populationType& population, const inputType& input, outputType& output1) {
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
-        workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1), ref(output2));
+        workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1));
 		set_thread_max_priority(std::ref(workers[i]));
 		// pin_cpu(workers[i], i);
     }
@@ -544,7 +494,7 @@ void runner() {
     for (auto& p : population)
         p = genMaze();
     array<int, 7> fitnesses;
-    array<int, 7> sortedFitnesses;
+	array<int, 7> indices_by_fitness;
     array<int, 7> indices;
     array<array<bool, size_>, size_> m1;
     array<array<bool, size_>, size_> m2;
@@ -555,7 +505,7 @@ void runner() {
 
     std::array<std::thread, NUM_THREADS_> workers;
     barrier_init(NUM_THREADS_);
-    thread_pool_init(workers, ref(population), ref(indices), ref(fitnesses), ref(sortedFitnesses));
+    thread_pool_init(workers, ref(population), ref(indices), ref(fitnesses));
     
     auto randomDevice = mt19937{random_device{}()};
     const int numIterations_ = generations_ * matingEventsPerGeneration_;
@@ -584,19 +534,20 @@ void runner() {
         // auto diff = end-start;
         // cout<<"\n time: "<< chrono::duration<double, milli>(diff).count()<<" ms";
         
-        // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
-        // find the fittest two members
-        // the fitnesses are sorted in descending order
-        sort(sortedFitnesses.begin(), sortedFitnesses.end(), greater<int>());
+        iota(indices_by_fitness.begin(), indices_by_fitness.end(), 0); // Fill with 0, 1, 2, ...
 
-        // https://stackoverflow.com/questions/22342581/returning-the-first-index-of-an-element-in-a-vector-in-c
-        // i1 and i2 contain the indices (wrt fitness[]) of the two fittest elements
-        i1 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[0]) - fitnesses.begin();
-        i2 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[1]) - fitnesses.begin();
-        // i1 and i2 cannot be the same
-        while (i1 == i2 || fitnesses[i2] != sortedFitnesses[1]) {
-            i2 = (i2 + 1)%7;
-        }
+		// Sort indices based on fitness values (in descending order)
+		sort(indices_by_fitness.begin(), indices_by_fitness.end(), 
+			[&fitnesses](int a, int b) { return fitnesses[a] > fitnesses[b]; });
+
+		// Now indices_by_fitness[0] is the index of the largest element,
+		// indices_by_fitness[1] is the index of the second largest, etc.
+
+		// Get the indices directly
+		i1 = indices_by_fitness[0]; // Index of largest
+		i2 = indices_by_fitness[1]; // Index of second largest
+		i3 = indices_by_fitness[6]; // Index of smallest
+		i4 = indices_by_fitness[5]; // Index of second smallest
 
         // cout << "\n i1: " << i1 << " | i2: " << i2 ;
 
@@ -626,16 +577,6 @@ void runner() {
         // cout << "\n m1 and m2 AFTER evolution: \n";
         // cout << m1 << "\n\n" << m2;
 
-        // now i3 and i4 will contain indces of the weakest 2 elements
-        i3 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[6]) - fitnesses.begin();
-        i4 = find(fitnesses.begin(), fitnesses.end(), sortedFitnesses[5]) - fitnesses.begin();
-        // i1, i2, i3 and i4 have to be different cannot be the same
-        while (i3 == i1 || i3 == i2 || fitnesses[i3] != sortedFitnesses[6]) {
-            i3 = (i3 + 1)%7;
-        }
-        while (i4 == i1 || i4 == i2 || i4 == i3 || fitnesses[i4] != sortedFitnesses[5]) {
-            i4 = (i4 + 1)%7;
-        }
 
         // cout << "\n i3: " << i3 << " | i4: " << i4 ;
 
