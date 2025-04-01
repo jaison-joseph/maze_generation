@@ -92,6 +92,29 @@ void init() {
      * 
      * Does order of this impact performance? If so, by how much
     */
+	/**
+	The maze has 1 start point, one end point, and 4 checkpoints
+	start point: (0, 0)
+	end point: (29, 29)
+	check points: (6, 24), (24, 6), (18, 12), (12, 18)
+
+	If we consider all permutations of the checkpoints (4!), that gives us 24 ways to traverse the checkpoints, 
+	then there are 24 ways to get to the end of the maze; these are the values of this map (numbers 0 - 23)
+
+	For each maze, we need to compute the shortest distance from start to finish
+
+	To that end, we don't run a path finder across the entire maze. Instead, we compute distance between 
+	start/end/check-points and check-points (one can see traversing the maze as simply starting at start, 
+	moving between checkpoints, and then moving to end) and then keep a map that stores total distance for
+	all possible 24 ways (this is pathDist in fitness_4)
+
+	The map below is telling us, given a key e.g. {{{ 0,  0}, { 6, 24}}}:
+		the key represents the path from (0, 0) to a checkpoint (6, 24)
+		the values of this key ({0, 1, 2, 3, 4, 5}) tell us which of the 24 possible paths
+			traverse from (0, 0) to (6, 24); the paths 0, 1, 2, 3, 4, 5 use them. For these paths, 
+			we add the distance from (0, 0) to (6, 24) to the total result of paths 0, 1, 2, 3, 4, 5
+
+	*/
     points2pathIdxs[{{{ 0,  0}, { 6, 24}}}] = {0, 1, 2, 3, 4, 5};
     points2pathIdxs[{{{ 0,  0}, {12, 18}}}] = {6, 7, 8, 9, 10, 11};
     points2pathIdxs[{{{ 0,  0}, {18, 12}}}] = {12, 13, 14, 15, 16, 17};
