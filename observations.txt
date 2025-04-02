@@ -52,3 +52,5 @@ Update: for profiling (MacOs):
 pprof --gv ./foobar ./profiling/prof.out
 
 pprof ./foobar ./profiling/prof.out
+
+update: genetic_4.cpp (2b44cd658c1ff7653f42a28e144becab3365b00d) is 2x faster than genetic_3.cpp

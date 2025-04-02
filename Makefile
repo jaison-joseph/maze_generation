@@ -53,10 +53,10 @@ LDFLAGS += -pthread
 LDFLAGS += $(if $(OPENMP), $(OPENMP_LINK),)
 
 # The name of your executable
-EXECUTABLE = foobar
+EXECUTABLE = foobar_4
 
 # Source file
-SOURCE = genetic_3.cpp
+SOURCE = genetic_4.cpp
 
 # Object file
 OBJECT = $(SOURCE:.cpp=.o)
