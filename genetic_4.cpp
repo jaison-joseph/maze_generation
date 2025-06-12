@@ -485,7 +485,7 @@ void thread_pool_init(std::array<std::thread, NUM_THREADS_>& workers, const popu
     for (int i = 0 ; i < NUM_THREADS_ ; i++) {
         workers[i] = std::thread(work, i, ref(population), ref(input), ref(output1));
 		set_thread_max_priority(std::ref(workers[i]));
-		// pin_cpu(workers[i], i);
+		pin_cpu(std::ref(workers[i]), i);
     }
 }
 
