@@ -353,6 +353,8 @@ __attribute__((hot)) int fitness_4(const array<array<bool, size_>, size_>& maze)
     return bestResult;
 }
 
+std::condition_variable barrier_cv;       // for lock-step
+
 void work(int x, const populationType& population, outputType& output, int& tasks_consumed) {
 
     pair<int, int> termination_symbol {-1, -1};
@@ -361,7 +363,7 @@ void work(int x, const populationType& population, outputType& output, int& task
 	while (true) {
 
 		pair<int, int> task = q.get_task(); // blocking
-		if (task == termination_symbol) break; // terminated
+		if (task.second == -1) break; // terminated
 
 		// work
 		task.first = fitness_4(population[task.second]);
@@ -370,8 +372,12 @@ void work(int x, const populationType& population, outputType& output, int& task
 		{
             lock_guard<mutex> lock(TaskQueueClient_pi::output_mutex);
             output[tasks_consumed++] = task;
-        }
-
+		}
+		
+		// wake up master thread if 'this' thread is last to finish in lock-step
+		if (tasks_consumed == NUM_THREADS_) {
+			barrier_cv.notify_one();
+		}
 	}
 }
 
@@ -429,9 +435,15 @@ void runner() {
         }
 
 		// wait for all tasks to be completed
-		while (tasks_consumed != NUM_THREADS_) {
-			this_thread::sleep_for(chrono::microseconds(1));
-		}
+		// while (tasks_consumed != NUM_THREADS_) {
+		// 	this_thread::sleep_for(chrono::microseconds(1));
+		// }
+		{
+            std::unique_lock<std::mutex> lock(TaskQueueClient_pi::output_mutex);
+
+            barrier_cv.wait(lock, [&]{ return tasks_consumed == NUM_THREADS_; });
+            // barrier_cv.wait(lock);
+        }
         
         // auto end = chrono::steady_clock::now();
         // auto diff = end-start;
@@ -443,7 +455,7 @@ void runner() {
 		// 	[&fitnesses](int a, int b) { return fitnesses[a] > fitnesses[b]; });
 		sort(
 			outputs.begin(), outputs.end(), 
-			[](pair<int, int> a, pair<int, int> b){ return a.first > b.first; }
+			[](const pair<int, int>& a, const pair<int, int>& b){ return a.first > b.first; }
 		);
 
 		// Now indices_by_fitness[0] is the index of the largest element,
@@ -477,6 +489,7 @@ void runner() {
         // overwrite the weakest two with the modified fittest two
         population[i3] = m1;
         population[i4] = m2;
+
         // cout << "sortedFitnesses: "
 		//  << outputs[0].first << ", "
 		//  << outputs[1].first << ", "
